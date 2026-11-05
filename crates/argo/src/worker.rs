@@ -62,7 +62,7 @@ impl Worker {
 pub async fn run(server:String,id:String,token:String,max_parallel:usize)->Result<(),Box<dyn std::error::Error>>{
     if token.len()<24 || id.trim().is_empty(){return Err("worker token and id required".into())}
     let worker=Worker {
-        base:server.trim_end_matches('/').into(),id,token,client:Client::builder().timeout(Duration::from_secs(20)).build()?,
+        base:server.trim_end_matches('/').into(),id,token,client:Client::builder().timeout(Duration::from_secs(100)).build()?,
         repos:paths(),root:PathBuf::from(std::env::var("ARGO_RUNS_DIR").unwrap_or_else(|_|"./data/runs".into())),
         demo:std::env::var("ARGO_DEMO_MODE").as_deref()==Ok("1"),
     };
@@ -75,6 +75,18 @@ pub async fn run(server:String,id:String,token:String,max_parallel:usize)->Resul
         if last_register.elapsed()>Duration::from_secs(12){
             if let Err(e)=worker.register(parallel).await{tracing::warn!(error=%e,"register failed");}
             last_register=std::time::Instant::now();
+        }
+        // File owners perform snapshot export and explicitly approved patch application.
+        // These are separate from ordinary agent task execution.
+        if let Ok(v)=worker.post("/api/v1/worker/source/claim",json!({"node_id":worker.id})).await {
+            if !v.is_null(){if let Ok(task)=serde_json::from_value::<TaskRow>(v){
+                let w=worker.clone();tokio::spawn(async move{prepare_source(w,task).await;});
+            }}
+        }
+        if let Ok(v)=worker.post("/api/v1/worker/apply/claim",json!({"node_id":worker.id})).await {
+            if !v.is_null(){if let Ok(task)=serde_json::from_value::<TaskRow>(v){
+                let w=worker.clone();tokio::spawn(async move{apply_approved(w,task).await;});
+            }}
         }
         if let Ok(permit)=semaphore.clone().try_acquire_owned(){
             match worker.post("/api/v1/worker/claim",json!({"node_id":worker.id})).await {
@@ -117,7 +129,16 @@ async fn execute(w:Worker,t:TaskRow)->Result<(),String>{
     }
     let output_dir=base.join("output");tokio::fs::create_dir_all(&output_dir).await.map_err(|e|e.to_string())?;
     let cwd=base.join("workspace");
-    if let Some(alias)=&t.repo_alias {
+    if t.source_state=="ready" {
+        // Remote executor receives a Git-archive snapshot produced by the file owner's worker.
+        let sha=t.source_sha.as_deref().ok_or("remote source hash missing")?;
+        let bundle=w.blob(sha).await?;
+        tokio::fs::create_dir_all(&cwd).await.map_err(|e|e.to_string())?;
+        unpack_archive(&cwd,bundle).await?;
+        git(&cwd,&["init","-q"]).await?;
+        git(&cwd,&["add","-A"]).await?;
+        git(&cwd,&["-c","user.name=Argo Snapshot","-c","user.email=argo@localhost","commit","--allow-empty","-q","-m","Owner source snapshot"]).await?;
+    } else if let Some(alias)=&t.repo_alias {
         let root=w.repos.get(alias).ok_or_else(||format!("repo alias not available on this node: {alias}"))?;
         // This detached Git worktree is the task's write boundary. Never run agents in the base checkout.
         let output=Command::new("git").args(["-C",root.to_str().ok_or("invalid repo path")?,"worktree","add","--detach",cwd.to_str().ok_or("invalid worktree path")?,"HEAD"]).output().await.map_err(|e|e.to_string())?;
@@ -210,9 +231,10 @@ async fn execute(w:Worker,t:TaskRow)->Result<(),String>{
         }
     };
     while let Ok((stream,line))=rx.try_recv(){w.report(&t.id,&stream,&line).await;if combined.len()<95_000{combined.push_str(&line);combined.push('\n')}}
-    // Synchronize tracked Git changes and explicitly exported files by SHA-256 blobs.
+    // Synchronize tracked AND newly created files (intent-to-add) as reviewable Git patch.
     if !cancelled && !["multica","orca"].contains(&t.provider.as_str()) {
         if t.repo_alias.is_some(){
+            let _=Command::new("git").arg("-C").arg(&cwd).args(["add","-N","."]).output().await;
             if let Ok(o)=Command::new("git").arg("-C").arg(&cwd).args(["diff","HEAD","--binary"]).output().await {
                 if o.status.success() && !o.stdout.is_empty() && o.stdout.len()<=10*1024*1024 {
                     if let Err(e)=w.save_artifact(&t.id,"changes.patch",o.stdout).await {w.report(&t.id,"system",&format!("artifact upload failed: {e}")).await}
@@ -271,4 +293,104 @@ pub fn repo_path_for(alias:&str)->Option<PathBuf>{paths().remove(alias)}
  #[test]fn paths_empty_is_supported(){let _=paths();}
  #[test]fn missing_command_is_false(){assert!(!has_command("argo-impossible-command-12345"));}
  #[test]fn works_with_file_names(){assert!(!Path::new("safe.txt").is_absolute());}
+}
+
+// A Git archive exports HEAD contents only, not the owner's Git history or working tree.
+async fn git(root:&Path,args:&[&str])->Result<String,String>{
+    let output=Command::new("git").arg("-C").arg(root).args(args).output().await.map_err(|e|e.to_string())?;
+    if !output.status.success(){return Err(format!("git {:?}: {}",args,String::from_utf8_lossy(&output.stderr)))}
+    Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+}
+fn scope_allowed(path:&str,scope:&str)->bool {
+    if path.starts_with('/')||path.contains('\')||path.split('/').any(|v|v==".."||v=="."){return false}
+    scope.is_empty()||path==scope||path.starts_with(&format!("{scope}/"))
+}
+async fn unpack_archive(root:&Path,bytes:Vec<u8>)->Result<(),String>{
+    let dir=root.to_path_buf();
+    tokio::task::spawn_blocking(move || {
+        let mut archive=tar::Archive::new(std::io::Cursor::new(bytes));
+        for result in archive.entries().map_err(|e|e.to_string())? {
+            let mut entry=result.map_err(|e|e.to_string())?;
+            let kind=entry.header().entry_type();
+            if !kind.is_file()&&!kind.is_dir(){return Err("snapshot contains a symlink or unsupported entry".into())}
+            let path=entry.path().map_err(|e|e.to_string())?;
+            if path.is_absolute()||path.components().any(|c|matches!(c,std::path::Component::ParentDir)){
+                return Err("snapshot contains unsafe archive path".into())
+            }
+            if !entry.unpack_in(&dir).map_err(|e|e.to_string())?{return Err("snapshot path escaped sandbox".into())}
+        }
+        Ok::<(),String>(())
+    }).await.map_err(|e|e.to_string())?
+}
+async fn prepare_source(w:Worker,t:TaskRow){
+    let result=async {
+        let alias=t.repo_alias.as_deref().ok_or("source repo alias missing")?;
+        let root=w.repos.get(alias).ok_or("source repo missing from file owner node")?;
+        if !git(root,&["status","--porcelain"]).await?.is_empty(){return Err("source repo has uncommitted changes; commit or stash before export".to_string())}
+        let commit=git(root,&["rev-parse","HEAD"]).await?;
+        let ctx:Value=serde_json::from_str(&t.context_json).map_err(|e|e.to_string())?;
+        let scope=ctx.get("argo_file_scope").and_then(Value::as_str).unwrap_or("");
+        let path=w.root.join(&w.id).join(&t.id);tokio::fs::create_dir_all(&path).await.map_err(|e|e.to_string())?;
+        let bundle=path.join("source.tar");
+        let file=std::fs::File::create(&bundle).map_err(|e|e.to_string())?;
+        let mut cmd=Command::new("git");cmd.arg("-C").arg(root).args(["archive","--format=tar","HEAD"]);
+        if !scope.is_empty(){cmd.arg("--").arg(scope);}
+        let mut proc=cmd.stdout(Stdio::from(file)).stderr(Stdio::piped()).spawn().map_err(|e|e.to_string())?;
+        let status=tokio::time::timeout(Duration::from_secs(90),proc.wait()).await.map_err(|_|"git archive timeout".to_string())?.map_err(|e|e.to_string())?;
+        if !status.success(){return Err("git archive could not export selected scope".to_string())}
+        let meta=tokio::fs::metadata(&bundle).await.map_err(|e|e.to_string())?;
+        if meta.len()==0||meta.len()>40*1024*1024{return Err("source archive must be 1..40 MiB; narrow the file scope".into())}
+        let bytes=tokio::fs::read(&bundle).await.map_err(|e|e.to_string())?;
+        let response=w.client.post(format!("{}/api/v1/blobs",w.base)).bearer_auth(&w.token)
+          .body(bytes).send().await.map_err(|e|e.to_string())?;
+        if !response.status().is_success(){return Err("blob upload rejected".into())}
+        let reply:Value=response.json().await.map_err(|e|e.to_string())?;
+        let sha=reply["sha256"].as_str().ok_or("blob receipt malformed")?;
+        Ok::<(String,String),String>((sha.to_string(),commit))
+    }.await;
+    let receipt=match result {Ok((sha,commit))=>json!({"node_id":w.id,"sha256":sha,"base_commit":commit,"error":null}),Err(e)=>json!({"node_id":w.id,"sha256":null,"base_commit":null,"error":e})};
+    if let Err(e)=w.post(&format!("/api/v1/worker/source/{}/complete",t.id),receipt).await{tracing::error!(task=%t.id,error=%e,"source receipt failed")}
+}
+async fn apply_approved(w:Worker,t:TaskRow){
+    let result=async {
+        let alias=t.repo_alias.as_deref().ok_or("apply requires repository")?;
+        let root=w.repos.get(alias).ok_or("file owner repository is no longer registered")?;
+        let original=t.source_commit.as_deref().ok_or("original commit missing")?;
+        let current=git(root,&["rev-parse","HEAD"]).await?;
+        if current!=original{return Err("source HEAD has moved; manual reconciliation required".into())}
+        let sha=t.apply_sha.as_deref().ok_or("approved patch missing")?;
+        let patch=w.blob(sha).await?;
+        if patch.len()>10*1024*1024||patch.is_empty(){return Err("patch exceeds review limits".into())}
+        if String::from_utf8_lossy(&patch).contains("new file mode 120000") {return Err("patch creates a symlink; blocked".into())}
+        let repo_run=w.root.join(&w.id).join(&t.id);
+        tokio::fs::create_dir_all(&repo_run).await.map_err(|e|e.to_string())?;
+        let approved=repo_run.join("reviewed-worktree");
+        let patch_file=repo_run.join("approved.patch");
+        tokio::fs::write(&patch_file,&patch).await.map_err(|e|e.to_string())?;
+        let branch=format!("argo/review-{}",t.id.replace('-',''));
+        let r=Command::new("git").arg("-C").arg(root).args(["worktree","add","-b",&branch])
+          .arg(&approved).arg("HEAD").output().await.map_err(|e|e.to_string())?;
+        if !r.status.success(){return Err(format!("could not create owner review branch: {}",String::from_utf8_lossy(&r.stderr)))}
+        let check=Command::new("git").arg("-C").arg(&approved).args(["apply","--check","--binary"]).arg(&patch_file).output().await.map_err(|e|e.to_string())?;
+        if !check.status.success(){return Err("patch cannot apply cleanly; isolated review worktree was preserved".into())}
+        git(&approved,&["apply","--binary",patch_file.to_str().ok_or("patch path encoding")?]).await?;
+        let ctx:Value=serde_json::from_str(&t.context_json).map_err(|e|e.to_string())?;
+        let scope=ctx.get("argo_file_scope").and_then(Value::as_str).unwrap_or("");
+        // Inspect all changed paths including untracked files, with NUL separators.
+        let status=Command::new("git").arg("-C").arg(&approved).args(["status","--porcelain","-z"]).output().await.map_err(|e|e.to_string())?;
+        if !status.status.success(){return Err("cannot audit reviewed worktree".into())}
+        for entry in status.stdout.split(|b|*b==0).filter(|r|!r.is_empty()) {
+            if entry.len()<4{return Err("unrecognized changed path".into())}
+            let name=std::str::from_utf8(&entry[3..]).map_err(|_|"non UTF-8 changed path needs manual review")?;
+            if !scope_allowed(name,scope){return Err(format!("change outside authorized scope: {name}; isolated worktree preserved"))}
+        }
+        Ok::<String,String>(format!("review_branch={branch};worktree={}",approved.display()))
+    }.await;
+    let report=match result {Ok(value)=>json!({"node_id":w.id,"success":true,"result":value}),Err(error)=>json!({"node_id":w.id,"success":false,"result":error})};
+    if let Err(e)=w.post(&format!("/api/v1/worker/apply/{}/complete",t.id),report).await{tracing::error!(task=%t.id,error=%e,"apply receipt failed")}
+}
+
+#[cfg(test)]mod cross_node_tests {
+  use super::*;
+  #[test]fn source_scope_is_path_boundary(){assert!(scope_allowed("src/main.rs","src"));assert!(!scope_allowed("src2/main.rs","src"));assert!(!scope_allowed("../secrets",""));}
 }

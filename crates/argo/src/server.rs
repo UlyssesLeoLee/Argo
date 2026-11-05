@@ -34,15 +34,21 @@ pub async fn serve(bind:&str,data_dir:&str, static_dir:&str, admin:String, worke
     let cleaner=state.pool.clone();
     tokio::spawn(async move {loop {tokio::time::sleep(std::time::Duration::from_secs(30)).await;if let Err(e)=expiration_scan(&cleaner).await {tracing::error!(error=%e,"lease scanner failed");}}});
     let app=Router::new()
-        .route("/health",get(||async{Json(json!({"status":"ok","service":"argo","version":"0.3.0"}))}))
+        .route("/health",get(||async{Json(json!({"status":"ok","service":"argo","version":"0.4.0"}))}))
         .route("/api/v1/providers",get(providers))
         .route("/api/v1/nodes",get(nodes))
         .route("/api/v1/tasks",get(tasks).post(create_task))
         .route("/api/v1/tasks/{id}",get(task))
         .route("/api/v1/tasks/{id}/events",get(events))
+        .route("/api/v1/tasks/{id}/diff",get(task_diff))
         .route("/api/v1/tasks/{id}/cancel",post(cancel))
         .route("/api/v1/blobs",post(upload_blob))
         .route("/api/v1/blobs/{sha}",get(download_blob))
+        .route("/api/v1/tasks/{id}/approve-patch",post(approve_patch))
+        .route("/api/v1/worker/source/claim",post(claim_source))
+        .route("/api/v1/worker/source/{id}/complete",post(complete_source))
+        .route("/api/v1/worker/apply/claim",post(claim_apply))
+        .route("/api/v1/worker/apply/{id}/complete",post(complete_apply))
         .route("/api/v1/worker/register",post(register))
         .route("/api/v1/worker/claim",post(claim))
         .route("/api/v1/worker/tasks/{id}/event",post(worker_event))
@@ -53,7 +59,7 @@ pub async fn serve(bind:&str,data_dir:&str, static_dir:&str, admin:String, worke
         .merge(crate::rag::routes())
         .merge(crate::ai::routes())
         .fallback_service(ServeDir::new(static_dir).append_index_html_on_directories(true))
-        .layer(DefaultBodyLimit::max(12 * 1024 * 1024))
+        .layer(DefaultBodyLimit::max(45 * 1024 * 1024))
         .with_state(Arc::new(state));
     let listener=tokio::net::TcpListener::bind(bind).await?;
     tracing::info!(%bind,"Argo controller started");
@@ -68,6 +74,17 @@ async fn migrate(pool:&SqlitePool)->Result<(),sqlx::Error>{
         "CREATE INDEX IF NOT EXISTS ix_tasks_state ON tasks(state,created_at)",
         "CREATE TABLE IF NOT EXISTS task_events(task_id TEXT NOT NULL,seq INTEGER NOT NULL,stream TEXT NOT NULL,content TEXT NOT NULL,created_at INTEGER NOT NULL,PRIMARY KEY(task_id,seq))",
     ] { sqlx::query(stmt).execute(pool).await?; }
+    // Migration remains compatible with 0.3 SQLite databases.
+    let cols=sqlx::query("PRAGMA table_info(tasks)").fetch_all(pool).await?;
+    for (name,definition) in [
+        ("file_owner_node","TEXT"),("source_state","TEXT NOT NULL DEFAULT 'none'"),
+        ("source_sha","TEXT"),("source_commit","TEXT"),
+        ("apply_state","TEXT NOT NULL DEFAULT 'none'"),("apply_sha","TEXT"),("apply_result","TEXT")
+    ] {
+        if !cols.iter().any(|row|row.get::<String,_>("name")==name) {
+            sqlx::query(&format!("ALTER TABLE tasks ADD COLUMN {name} {definition}")).execute(pool).await?;
+        }
+    }
     Ok(())
 }
 
@@ -107,12 +124,24 @@ async fn create_task(State(s):State<Arc<ServerState>>,h:HeaderMap,Json(t):Json<N
     for a in &t.attachments {
         if !s.data_dir.join("blobs").join(&a.sha256).is_file() {return Err(err(StatusCode::BAD_REQUEST,format!("attachment not uploaded: {}",a.name)))}
     }
+    let owner=ctx(&t.context,"argo_file_owner").map(str::to_owned);
+    let remote=t.repo_alias.is_some() && owner.as_deref()!=t.target_node.as_deref();
+    if t.repo_alias.is_some() {
+        // Both nodes must be registered, and only the file owner must own the source repository.
+        let owner_id=owner.as_deref().ok_or(err(StatusCode::BAD_REQUEST,"missing file owner"))?;
+        let source=sqlx::query_as::<_,NodeRow>("SELECT * FROM nodes WHERE id=? AND last_seen>?")
+            .bind(owner_id).bind(now()-60).fetch_optional(&s.pool).await.map_err(internal)?
+            .ok_or(err(StatusCode::PRECONDITION_FAILED,"file owner is offline"))?;
+        let repos:Vec<String>=serde_json::from_str(&source.repos_json).unwrap_or_default();
+        if !repos.iter().any(|r|Some(r.as_str())==t.repo_alias.as_deref()) {return Err(err(StatusCode::BAD_REQUEST,"repository alias not present on file owner"));}
+    }
     let id=uuid::Uuid::new_v4().to_string();
-    sqlx::query("INSERT INTO tasks(id,title,prompt,provider,model,target_node,repo_alias,context_json,attachments_json,state,created_at) VALUES(?,?,?,?,?,?,?,?,?,'queued',?)")
+    sqlx::query("INSERT INTO tasks(id,title,prompt,provider,model,target_node,repo_alias,context_json,attachments_json,state,created_at,file_owner_node,source_state) VALUES(?,?,?,?,?,?,?,?,?,'queued',?,?,?)")
         .bind(&id).bind(&t.title).bind(&t.prompt).bind(&t.provider).bind(&t.model).bind(&t.target_node).bind(&t.repo_alias)
         .bind(serde_json::to_string(&t.context).map_err(internal)?)
         .bind(serde_json::to_string(&t.attachments).map_err(internal)?)
-        .bind(now()).execute(&s.pool).await.map_err(internal)?;
+        .bind(now()).bind(owner).bind(if remote{"pending"}else{"none"})
+        .execute(&s.pool).await.map_err(internal)?;
     Ok(Json(json!({"id":id,"state":"queued"})))
 }
 #[derive(Deserialize)]struct Since{since:Option<i64>}
@@ -131,7 +160,7 @@ async fn cancel(State(s):State<Arc<ServerState>>,h:HeaderMap,Path(id):Path<Strin
 }
 async fn upload_blob(State(s):State<Arc<ServerState>>,h:HeaderMap,bytes:Bytes)->ApiResult<Value>{
     auth_either(&h,&s)?;
-    if bytes.is_empty() || bytes.len()>10*1024*1024{return Err(err(StatusCode::BAD_REQUEST,"file must be 1..10 MiB"))}
+    if bytes.is_empty() || bytes.len()>40*1024*1024{return Err(err(StatusCode::BAD_REQUEST,"blob must be 1..40 MiB"))}
     let sha=hex::encode(Sha256::digest(&bytes));
     let destination=s.data_dir.join("blobs").join(&sha);
     if !destination.is_file(){
@@ -170,7 +199,9 @@ async fn claim(State(s):State<Arc<ServerState>>,h:HeaderMap,Json(n):Json<WorkerN
     for item in queue {
         if !available.contains(&item.provider) {continue}
         if item.target_node.as_deref().is_some_and(|target|target!=n.node_id){continue}
-        if item.repo_alias.as_deref().is_some_and(|repo|!repos.iter().any(|r|r==repo)){continue}
+        if item.source_state=="pending" || item.source_state=="preparing" || item.source_state=="failed" {continue}
+        // Remote executor receives a snapshot blob, not a file system mount.
+        if item.source_state=="none" && item.repo_alias.as_deref().is_some_and(|repo|!repos.iter().any(|r|r==repo)){continue}
         // Compare-and-swap ensures multiple daemon claims cannot take the same task.
         let changed=sqlx::query("UPDATE tasks SET state='running',assigned_node=?,started_at=?,lease_until=? WHERE id=? AND state='queued'")
             .bind(&n.node_id).bind(now()).bind(now()+90).bind(&item.id).execute(&s.pool).await.map_err(internal)?;
@@ -245,3 +276,79 @@ pub async fn expiration_scan(pool:&SqlitePool)->Result<u64,sqlx::Error>{
 }
 
 pub fn is_under(candidate:&FilePath,root:&FilePath)->bool{candidate.canonicalize().ok().zip(root.canonicalize().ok()).is_some_and(|(a,b)|a.starts_with(b))}
+
+// ---- Two-phase cross-node repository transfer; no direct access to the owner's checkout. ----
+#[derive(Deserialize)]struct SourceReceipt {node_id:String, sha256:Option<String>, base_commit:Option<String>, error:Option<String>}
+#[derive(Deserialize)]struct PatchApproval {sha256:String,confirm:bool}
+#[derive(Deserialize)]struct ApplyReceipt {node_id:String,success:bool,result:String}
+fn sha_ok(s:&str)->bool{s.len()==64&&s.bytes().all(|x|x.is_ascii_hexdigit())}
+
+async fn claim_source(State(s):State<Arc<ServerState>>,h:HeaderMap,Json(n):Json<WorkerNode>)->ApiResult<Value>{
+ auth(&h,&s.worker_token)?;
+ let item=sqlx::query_as::<_,TaskRow>("SELECT * FROM tasks WHERE file_owner_node=? AND source_state='pending' AND state='queued' ORDER BY created_at LIMIT 1")
+   .bind(&n.node_id).fetch_optional(&s.pool).await.map_err(internal)?;
+ let Some(item)=item else{return Ok(Json(Value::Null))};
+ let changed=sqlx::query("UPDATE tasks SET source_state='preparing' WHERE id=? AND source_state='pending'")
+   .bind(&item.id).execute(&s.pool).await.map_err(internal)?;
+ if changed.rows_affected()==0{return Ok(Json(Value::Null))}
+ Ok(Json(json!(item)))
+}
+async fn complete_source(State(s):State<Arc<ServerState>>,h:HeaderMap,Path(id):Path<String>,Json(v):Json<SourceReceipt>)->ApiResult<Value>{
+ auth(&h,&s.worker_token)?;
+ let succeeded=v.error.is_none()&&v.sha256.as_deref().is_some_and(sha_ok)&&v.base_commit.as_deref().is_some_and(|x|x.len()>=40&&x.len()<=64&&x.bytes().all(|b|b.is_ascii_hexdigit()));
+ if succeeded && !s.data_dir.join("blobs").join(v.sha256.as_deref().unwrap_or("")).is_file(){return Err(err(StatusCode::BAD_REQUEST,"snapshot blob missing"))}
+ let changed=sqlx::query("UPDATE tasks SET source_state=?,source_sha=?,source_commit=?,error=CASE WHEN ? THEN NULL ELSE ? END,state=CASE WHEN ? THEN state ELSE 'needs_review' END WHERE id=? AND file_owner_node=? AND source_state='preparing'")
+  .bind(if succeeded{"ready"}else{"failed"}).bind(&v.sha256).bind(&v.base_commit).bind(succeeded).bind(v.error.unwrap_or_else(||"invalid snapshot".into())).bind(succeeded).bind(id).bind(v.node_id)
+  .execute(&s.pool).await.map_err(internal)?;
+ if changed.rows_affected()==0{return Err(err(StatusCode::CONFLICT,"source not owned or not preparing"))}
+ Ok(Json(json!({"ok":true,"source_state":if succeeded{"ready"}else{"failed"}})))
+}
+async fn approve_patch(State(s):State<Arc<ServerState>>,h:HeaderMap,Path(id):Path<String>,Json(req):Json<PatchApproval>)->ApiResult<Value>{
+ auth(&h,&s.admin_token)?;
+ if !req.confirm||!sha_ok(&req.sha256){return Err(err(StatusCode::BAD_REQUEST,"explicit approval and valid patch SHA-256 required"))}
+ let row=sqlx::query_as::<_,TaskRow>("SELECT * FROM tasks WHERE id=?").bind(&id).fetch_optional(&s.pool).await.map_err(internal)?
+  .ok_or(err(StatusCode::NOT_FOUND,"task missing"))?;
+ if row.source_state!="ready" || row.state!="completed" || row.apply_state!="none" || row.file_owner_node==row.assigned_node {
+  return Err(err(StatusCode::CONFLICT,"only completed cross-node tasks with unapplied patches may be approved"));
+ }
+ let artifacts:Vec<Value>=serde_json::from_str(&row.artifacts_json).unwrap_or_default();
+ if !artifacts.iter().any(|a|a["name"]=="changes.patch"&&a["sha256"]==req.sha256){return Err(err(StatusCode::BAD_REQUEST,"approved SHA must match the task changes.patch artifact"))}
+ let changed=sqlx::query("UPDATE tasks SET apply_state='approved',apply_sha=? WHERE id=? AND apply_state='none'")
+  .bind(req.sha256).bind(id).execute(&s.pool).await.map_err(internal)?;
+ if changed.rows_affected()==0{return Err(err(StatusCode::CONFLICT,"already approved"))}
+ Ok(Json(json!({"ok":true,"apply_state":"approved"})))
+}
+async fn claim_apply(State(s):State<Arc<ServerState>>,h:HeaderMap,Json(n):Json<WorkerNode>)->ApiResult<Value>{
+ auth(&h,&s.worker_token)?;
+ let item=sqlx::query_as::<_,TaskRow>("SELECT * FROM tasks WHERE file_owner_node=? AND apply_state='approved' ORDER BY created_at LIMIT 1")
+  .bind(&n.node_id).fetch_optional(&s.pool).await.map_err(internal)?;
+ let Some(item)=item else{return Ok(Json(Value::Null))};
+ let changed=sqlx::query("UPDATE tasks SET apply_state='applying' WHERE id=? AND apply_state='approved'")
+  .bind(&item.id).execute(&s.pool).await.map_err(internal)?;
+ if changed.rows_affected()==0{return Ok(Json(Value::Null))}
+ Ok(Json(json!(item)))
+}
+async fn complete_apply(State(s):State<Arc<ServerState>>,h:HeaderMap,Path(id):Path<String>,Json(v):Json<ApplyReceipt>)->ApiResult<Value>{
+ auth(&h,&s.worker_token)?;
+ let changed=sqlx::query("UPDATE tasks SET apply_state=?,apply_result=? WHERE id=? AND file_owner_node=? AND apply_state='applying'")
+ .bind(if v.success{"applied"}else{"needs_review"}).bind(v.result.chars().take(4000).collect::<String>()).bind(id).bind(v.node_id)
+ .execute(&s.pool).await.map_err(internal)?;
+ if changed.rows_affected()==0{return Err(err(StatusCode::CONFLICT,"apply not owned or not in progress"))}
+ Ok(Json(json!({"ok":true})))
+}
+
+async fn task_diff(State(s):State<Arc<ServerState>>,h:HeaderMap,Path(id):Path<String>)->ApiResult<Value>{
+    auth(&h,&s.admin_token)?;
+    let row=sqlx::query_as::<_,TaskRow>("SELECT * FROM tasks WHERE id=?").bind(&id).fetch_optional(&s.pool).await.map_err(internal)?
+      .ok_or(err(StatusCode::NOT_FOUND,"task missing"))?;
+    let artifacts:Vec<Value>=serde_json::from_str(&row.artifacts_json).unwrap_or_default();
+    let patch=artifacts.iter().find(|a|a["name"]=="changes.patch").ok_or(err(StatusCode::NOT_FOUND,"no tracked source changes"))?;
+    let sha=patch["sha256"].as_str().ok_or(err(StatusCode::INTERNAL_SERVER_ERROR,"patch checksum missing"))?;
+    if !sha_ok(sha){return Err(err(StatusCode::INTERNAL_SERVER_ERROR,"invalid checksum"))}
+    let bytes=tokio::fs::read(s.data_dir.join("blobs").join(sha)).await.map_err(internal)?;
+    if hex::encode(Sha256::digest(&bytes))!=sha{return Err(internal("patch integrity error"))}
+    // The UI must not approve a truncated diff; larger changes require separate human review.
+    let truncated=bytes.len()>200_000;
+    let view=String::from_utf8_lossy(&bytes[..bytes.len().min(200_000)]).to_string();
+    Ok(Json(json!({"sha256":sha,"patch":view,"truncated":truncated,"bytes":bytes.len(),"state":row.apply_state})))
+}

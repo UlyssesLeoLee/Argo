@@ -35,8 +35,17 @@ def main():
             server=subprocess.Popen(command+['server'],cwd=ROOT,env=env,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE)
             procs.append(server)
             eventually(lambda:urllib.request.urlopen(host+'/health',timeout=2).status,lambda s:s==200,timeout=40)
+            # The source node owns a real Git checkout; executor B owns no checkout.
+            source_repo=pathlib.Path(directory)/'file-owner';source_repo.mkdir()
+            subprocess.run(['git','-C',str(source_repo),'init','-q'],check=True)
+            subprocess.run(['git','-C',str(source_repo),'config','user.name','Argo E2E'],check=True)
+            subprocess.run(['git','-C',str(source_repo),'config','user.email','argo@localhost'],check=True)
+            (source_repo/'src').mkdir();(source_repo/'src'/'hello.txt').write_text('original\n')
+            subprocess.run(['git','-C',str(source_repo),'add','-A'],check=True)
+            subprocess.run(['git','-C',str(source_repo),'commit','-qm','initial'],check=True)
             for nid in ('machine-a','machine-b'):
-                procs.append(subprocess.Popen(command+['worker'],cwd=ROOT,env={**env,'ARGO_NODE_ID':nid},stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL))
+                values={**env,'ARGO_NODE_ID':nid,'ARGO_REPOS':f'project={source_repo}' if nid=='machine-a' else ''}
+                procs.append(subprocess.Popen(command+['worker'],cwd=ROOT,env=values,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL))
             nodes=eventually(lambda:call(host,'/api/v1/nodes',token_admin),lambda n:len(n)>=2)
             assert {n['id'] for n in nodes}=={'machine-a','machine-b'}
             b=b'Argo tests binary blob\n';uploaded=call(host,'/api/v1/blobs',token_admin,'POST',b,blob=True)
@@ -48,6 +57,15 @@ def main():
             assert done['assigned_node']=='machine-b'
             events=call(host,f"/api/v1/tasks/{task['id']}/events?since=0",token_admin)
             assert len(events)>=1
+            # Two-node snapshot: owner A exports only src/; B runs with the snapshot.
+            remote=call(host,'/api/v1/tasks',token_admin,'POST',{'title':'Remote source snapshot','prompt':'Edit the scoped file',
+                'provider':'claude','target_node':'machine-b','repo_alias':'project',
+                'context':{'argo_file_owner':'machine-a','argo_file_scope':'src'}})
+            done_remote=eventually(lambda:call(host,'/api/v1/tasks/'+remote['id'],token_admin),
+                lambda t:t['state']=='completed' and t['source_state']=='ready',timeout=50)
+            assert done_remote['assigned_node']=='machine-b'
+            assert done_remote['source_sha'] and done_remote['source_commit']
+            assert (source_repo/'src'/'hello.txt').read_text()=='original\n'
             # Multica metadata adapter: simulated stdout but still validates the transport.
             discovery=call(host,'/api/v1/tasks',token_admin,'POST',{'provider':'multica','title':'Catalog','prompt':'Read projects',
                'context':{'multica_workspace_id':'w','argo_action':'discover_projects'}})
@@ -55,7 +73,7 @@ def main():
             try:call(host,'/api/v1/tasks',token_admin+'WRONG','POST',payload)
             except urllib.error.HTTPError as e:assert e.code==401
             else:raise AssertionError('Missing authorization enforcement')
-            print('PASS E2E: 2 workers, pinned node, blob SHA, events, Multica catalog, auth')
+            print('PASS E2E: 2 workers, pinned node, owner snapshot + remote execution, blob SHA, events, Multica catalog, auth')
         finally:
             for p in reversed(procs):
                 p.terminate()

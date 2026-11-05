@@ -13,7 +13,7 @@ with sync_playwright() as p:
     errors=[]
     page.on('pageerror',lambda err: errors.append(str(err)))
     page.goto(url,wait_until='domcontentloaded')
-    assert page.locator('.agent-tab').count()==6
+    assert page.locator('.agent-tab').count()==7
     page.locator('[data-agent="orca"]').click()
     assert page.locator('#or').is_visible()
     assert page.locator('#mw').count()==0

@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {PROVIDERS,makeTask,validateTask} from '../web/lib.mjs';
+import {PROVIDERS,makeTask,validateTask} from '../web/lib.js';
 const file=(path)=>readFileSync(new URL(path,import.meta.url),'utf8');
-const html=file('../web/index.html'),js=file('../web/app.mjs');
+const html=file('../web/index.html'),js=file('../src/app.ts');
 const ai=file('../crates/argo/src/ai.rs'),rag=file('../crates/argo/src/rag.rs');
 const model=file('../crates/argo/src/model.rs'),worker=file('../crates/argo/src/worker.rs');
 const task=(context)=>makeTask({provider:'star',title:'Demo',prompt:'run task',context});

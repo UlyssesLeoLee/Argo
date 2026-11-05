@@ -38,6 +38,14 @@ pub struct TaskRow {
     pub lease_until: Option<i64>,
     pub output: Option<String>,
     pub error: Option<String>,
+    // Cross-node, owner-produced archive (no Git history) and reviewed writeback.
+    pub file_owner_node: Option<String>,
+    pub source_state: String,
+    pub source_sha: Option<String>,
+    pub source_commit: Option<String>,
+    pub apply_state: String,
+    pub apply_sha: Option<String>,
+    pub apply_result: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
@@ -101,11 +109,14 @@ pub fn validate(t: &NewTask) -> Result<(), String> {
     for v in [&t.model, &t.target_node, &t.repo_alias] {
         if v.as_deref().is_some_and(|s| s.len() > 160 || s.contains('\0')) { return Err("invalid selector".into()); }
     }
-    // The source machine owns repository files; cross-node edits are rejected until
-    // a reviewed patch/snapshot reconciliation protocol is implemented.
+    // Cross-node execution requires an explicit file owner and execution node.
+    // The owner exports a clean HEAD snapshot; the executor receives no live disk access.
     if t.repo_alias.is_some() {
-        if let Some(owner)=ctx(&t.context,"argo_file_owner") {
-            if t.target_node.as_deref()!=Some(owner) {return Err("file-owner and executor must match for repository edits".into());}
+        let owner=ctx(&t.context,"argo_file_owner").ok_or("repository task requires argo_file_owner")?;
+        let executor=t.target_node.as_deref().ok_or("repository task requires explicit execution node")?;
+        if owner.trim().is_empty() || executor.trim().is_empty() {return Err("invalid node identity".into());}
+        if owner!=executor && ["orca","multica","star"].contains(&t.provider.as_str()) {
+            return Err("cross-node Git snapshot execution supports only direct CLI agents; orchestrator adapters must run without a remote file repository".into());
         }
     }
     if let Some(scope)=ctx(&t.context,"argo_file_scope") {
@@ -223,9 +234,19 @@ mod tests {
         assert!(validate(&sample("multica",r#"{"multica_workspace_id":"w","multica_project_id":"p","multica_assignee":"bot"}"#)).is_ok());
         assert!(validate(&sample("orca",r#"{"orca_repo_id":"r","orca_agent":"codex"}"#)).is_ok());
     }
+    #[test] fn cross_node_cli_snapshot_request_validates() {
+        let mut t=sample("codex",r#"{"argo_file_owner":"node-a","argo_file_scope":"src"}"#);
+        t.repo_alias=Some("myrepo".into());t.target_node=Some("node-b".into());
+        assert!(validate(&t).is_ok());
+        t.provider="orca".into();
+        assert!(validate(&t).is_err());
+        t.provider="codex".into();
+        t.context=serde_json::json!({"argo_file_owner":"node-a","argo_file_scope":"../secret"});
+        assert!(validate(&t).is_err());
+    }
     #[test] fn prompt_remains_one_argv_value() {
         let t=sample("codex","{}");
-        let row=TaskRow { id:"abc12345".into(),title:t.title,prompt:t.prompt.clone(),provider:t.provider,model:None,target_node:None,assigned_node:None,repo_alias:None,context_json:"{}".into(),attachments_json:"[]".into(),artifacts_json:"[]".into(),state:"queued".into(),created_at:0,started_at:None,finished_at:None,lease_until:None,output:None,error:None };
+        let row=TaskRow { id:"abc12345".into(),title:t.title,prompt:t.prompt.clone(),provider:t.provider,model:None,target_node:None,assigned_node:None,repo_alias:None,context_json:"{}".into(),attachments_json:"[]".into(),artifacts_json:"[]".into(),state:"queued".into(),created_at:0,started_at:None,finished_at:None,lease_until:None,output:None,error:None,file_owner_node:None,source_state:"none".into(),source_sha:None,source_commit:None,apply_state:"none".into(),apply_sha:None,apply_result:None };
         let invoke=invocation(&row,"prompt.txt").unwrap();
         assert_eq!(invoke.args.last().unwrap(),&t.prompt);
         assert_eq!(invoke.program,"codex");

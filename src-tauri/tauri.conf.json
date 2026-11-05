@@ -1,12 +1,13 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Argo",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "identifier": "dev.argo.agent.cluster",
   "build": {
     "frontendDist": "../web",
     "devUrl": "http://localhost:8997",
-    "beforeDevCommand": "python -m http.server 8997 --directory web"
+    "beforeDevCommand": "node scripts/dev-web.mjs",
+    "beforeBuildCommand": "npm run build:web"
   },
   "app": {
     "windows": [
@@ -25,12 +26,15 @@
     "withGlobalTauri": true
   },
   "bundle": {
-    "active": false,
+    "active": true,
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/256x256.png",
       "icons/icon.ico"
+    ],
+    "externalBin": [
+      "binaries/argo-runtime"
     ]
   }
 }

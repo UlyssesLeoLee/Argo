@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {splitContext,cleanTags,redactPreview,buildCitationContext,validScope,canRunOnMachine,statuses} from '../web/rag.lib.mjs';
-const source=readFileSync(new URL('../web/app.mjs', import.meta.url),'utf8');
+import {splitContext,cleanTags,redactPreview,buildCitationContext,validScope,canRunOnMachine,statuses} from '../web/rag.lib.js';
+const source=readFileSync(new URL('../src/app.ts', import.meta.url),'utf8');
 const html=readFileSync(new URL('../web/index.html', import.meta.url),'utf8');
 const rust=readFileSync(new URL('../crates/argo/src/rag.rs', import.meta.url),'utf8');
 const route=readFileSync(new URL('../examples/vercel-rag-gateway/app/api/argo/rag/upsert/route.ts',import.meta.url),'utf8');
@@ -24,8 +24,8 @@ test('RAG-UT-08 rejects dangerous relative paths',()=>{
  for(const p of ['../secret','src/../secret','/etc/passwd','C:\\Users','src\\private','./src'])assert.equal(validScope(p),false,p);
  assert.equal(validScope('src/ui/'),true);
 });
-test('RAG-UT-09 file owner independent from runner and prevents miswrite',()=>{
- assert.equal(canRunOnMachine('A','B','Star'),false);
+test('RAG-UT-09 file owner independent from runner with reviewed sync',()=>{
+ assert.equal(canRunOnMachine('A','B','Star'),true);
  assert.equal(canRunOnMachine('A','A','Star'),true);
  assert.equal(canRunOnMachine('A','B',''),true);
 });

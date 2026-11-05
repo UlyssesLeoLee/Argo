@@ -7,3 +7,6 @@
 *.log
 .DS_Store
 node_modules/
+
+src-tauri/binaries/*
+!src-tauri/binaries/README.md

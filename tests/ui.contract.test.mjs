@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {PROVIDERS,validateTask,makeTask,normalizeCatalog,escapeHtml,stateLabels} from '../web/lib.mjs';
+import {PROVIDERS,validateTask,makeTask,normalizeCatalog,escapeHtml,stateLabels} from '../web/lib.js';
 const base=()=>makeTask({provider:'codex',title:'Fix API',prompt:'Use tests before edits',context:{}});
 test('UT-UI-01 seven unique provider cards',()=>{
  assert.equal(PROVIDERS.length,7);
@@ -35,7 +35,7 @@ test('UT-UI-09 state machine labels cover dispatched and needs review',()=>{
  assert.equal(stateLabels.dispatched,'已派发');assert.ok(stateLabels.needs_review);
 });
 test('UT-UI-10 UI references correct routes',()=>{
- const text=readFileSync(new URL('../web/app.mjs',import.meta.url),'utf8');
+ const text=readFileSync(new URL('../src/app.ts',import.meta.url),'utf8');
  for(const path of ['/api/v1/tasks','/api/v1/nodes','/api/v1/providers']) assert.ok(text.includes(path), `UI must use ${path}`);
  const server=readFileSync(new URL('../crates/argo/src/server.rs',import.meta.url),'utf8');
  assert.ok(server.includes('/api/v1/blobs'), 'blob transfer is a server/worker protocol, not a direct UI call');

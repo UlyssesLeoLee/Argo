@@ -1,15 +1,25 @@
 {
   "name": "argo-desktop",
   "private": true,
-  "version": "0.3.0",
+  "version": "0.4.0",
   "type": "module",
   "scripts": {
-    "preview": "python -m http.server 8899 --directory web",
-    "dev": "tauri dev",
-    "build": "tauri build",
-    "test": "node --test tests/ui.contract.test.mjs tests/rag.contract.test.mjs tests/v03.contract.test.mjs"
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc -p tsconfig.contracts.json",
+    "build:web": "tsc -p tsconfig.json",
+    "dev:web": "node scripts/dev-web.mjs",
+    "preview": "npm run build:web && node scripts/serve-web.mjs",
+    "prepare:runtime": "node scripts/prepare-sidecar.mjs",
+    "dev": "npm run prepare:runtime && npm run build:web && tauri dev",
+    "build": "npm run build:web && npm run prepare:runtime -- --release && tauri build",
+    "test": "npm run build:web && node --test tests/*.test.mjs",
+    "test:rust": "cargo test -p argo-runtime",
+    "test:integration": "python tests/integration_cluster.py",
+    "check:desktop": "cargo check -p argo-desktop",
+    "check:all": "npm run typecheck && npm test"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "^2.0.0"
-  }
+    "@tauri-apps/cli": "^2.0.0",
+    "typescript": "^5.8.3"
+  },
+  "description": "Argo Tauri 2 + TypeScript UI + Rust Controller/Daemon and universal RAG"
 }

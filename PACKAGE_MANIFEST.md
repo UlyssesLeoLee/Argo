@@ -1,31 +1,18 @@
-# Argo v0.3.0 — 交付文件清单
+# Argo v0.4.0 — 交付内容清单
 
-- 交付日期：2026-11-05
-- 范围：源码、界面 SVG/PNG、Logo、接口配置、Markdown 设计与测试文档、Excel 需求/测试/WBS、脚本。
-- 验证：49/49 JavaScript 契约测试通过；JS/JSON/YAML/SVG/Python 静态解析通过；ZIP CRC 验证通过。
-- 未验证：Rust/Tauri 编译，第三方 CLI 调用真机，STAR 真实 API，双机联网与任意外部 RAG 联调。
+- 交付形式：**Rust + Tauri 2 + TypeScript 源码 ZIP**，非已编译的 EXE/MSI。
+- `src/*.ts`：前端唯一可维护源码，类型化七平台、机器与 RAG 接口；`web/*.js` 是 TypeScript 预编译产物。
+- `src-tauri/`：Rust Tauri 2 主进程及 sidecar 管理，Bundler 已启用（需要 Rust 编译环境）。
+- `crates/argo/`：Rust Controller、Worker、AI Agent、Git 跨机快照及 RAG/AI 功能。
+- `design/`：可编辑 SVG / PNG 设计稿，以及 Argo 和 STAR ? 占位 Logo。
+- `docs/`：要件定义、基本/详细设计、UT/IT/ST/E2E、运营与 v0.4 TS 专项设计。
+- `examples/`：STAR SDK、通用接口/可选个人 RAG 网关示例。
+- `scripts/`：开发预览服务器、TS watch、Rust sidecar 构建、CLI 验证和自动化测试。
+- `tests/`：80 项 Node 契约及离线 Git 快照/补丁冒烟脚本、Rust/集群 E2E 测试脚本。
+- `requirements_and_tests.xlsx`：需求追踪、测试矩阵、WBS、Agent 与 RAG 数据字典、v0.4 专项表。
 
-## 内容模块
+## 当前验证状态
 
-- **前端及 Tauri 应用**：`web/ + src-tauri/`
-- **Rust Controller、Worker、CLI 适配与 AI 处理**：`crates/argo/`
-- **SVG UI 原稿、PNG 预览、品牌图标**：`design/`
-- **要件、基本、详细、UT/IT/ST/E2E、运维与 WBS 设计**：`docs/`
-- **配置、OpenAPI、Star 与通用 RAG 对接示例**：`examples/`
-- **自动化与预检脚本**：`scripts/ + tests/`
-- **追踪矩阵**：`requirements_and_tests.xlsx`
+**通过**：`npm run typecheck`；`npm test`（80/80）；`python tests/smoke_snapshot_patch.py`。ZIP 完整性见 `SHA256SUMS.txt` 和压缩包 CRC 校验。
 
-## 安全与功能约束
-
-- RAG 用户密钥仅为当前请求传输，不内置硬编码密钥；生产环境仍须配置机密管理和 TLS。
-- 全库 AI 整理先预览与确认，进行受控批量变更，保留历史版本，改写后进入待审核。
-- 所有外部 RAG 提供商通过通用 HTTPS JSON 契约接入，不在客户端品牌化。
-- STAR 是尚未公开的平台占位适配，使用问号图标，需提供真实 API 方可运行。
-- 跨机派发与跨机文件写回不是同一件事：目前写入执行仍要求执行机器与文件归属机器一致，跨节点安全写回留作后续。
-
-## 入门
-
-1. 浏览 `README.md` 与 `docs/`。
-2. 无真实操作演示：`python -m http.server 8899 --directory web`，然后访问 `http://localhost:8899/?demo=1`。
-3. 运行契约测试：`npm test`。
-4. Rust、Tauri 及集群测试参阅 `scripts/` 与 `docs/06_operations/`。
+**未验证**：真实 Rust/Tauri 编译、Windows 安装包、七 CLI 全量真实兼容性、双机实际执行、第三方 RAG 联调。不得视为生产可用版本。

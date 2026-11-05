@@ -1,3 +1,4 @@
 [workspace]
-members = ["crates/argo"]
+members = ["crates/argo", "src-tauri"]
+default-members = ["crates/argo"]
 resolver = "2"
