@@ -1,6 +1,6 @@
 [package]
 name = "argo-runtime"
-version = "0.1.0"
+version = "0.3.0"
 edition = "2021"
 license = "MIT"
 description = "Argo independent multi-node AI agent execution daemon and control plane"
@@ -19,3 +19,5 @@ tower-http = { version = "0.6", features = ["fs", "trace"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 futures = "0.3"
+
+regex = "1"

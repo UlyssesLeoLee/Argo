@@ -29,11 +29,12 @@ pub async fn serve(bind:&str,data_dir:&str, static_dir:&str, admin:String, worke
     let options=SqliteConnectOptions::new().filename(root.join("argo.sqlite")).create_if_missing(true).journal_mode(SqliteJournalMode::Wal);
     let pool=SqlitePoolOptions::new().max_connections(8).connect_with(options).await?;
     migrate(&pool).await?;
+    crate::rag::migrate(&pool).await?;
     let state=ServerState {pool,admin_token:admin,worker_token:worker,data_dir:root};
     let cleaner=state.pool.clone();
     tokio::spawn(async move {loop {tokio::time::sleep(std::time::Duration::from_secs(30)).await;if let Err(e)=expiration_scan(&cleaner).await {tracing::error!(error=%e,"lease scanner failed");}}});
     let app=Router::new()
-        .route("/health",get(||async{Json(json!({"status":"ok","service":"argo","version":"0.1.0"}))}))
+        .route("/health",get(||async{Json(json!({"status":"ok","service":"argo","version":"0.3.0"}))}))
         .route("/api/v1/providers",get(providers))
         .route("/api/v1/nodes",get(nodes))
         .route("/api/v1/tasks",get(tasks).post(create_task))
@@ -49,6 +50,8 @@ pub async fn serve(bind:&str,data_dir:&str, static_dir:&str, admin:String, worke
         .route("/api/v1/worker/tasks/{id}/renew",post(renew))
         .route("/api/v1/worker/tasks/{id}/state",post(worker_state))
         .route("/api/v1/worker/tasks/{id}/finish",post(finish))
+        .merge(crate::rag::routes())
+        .merge(crate::ai::routes())
         .fallback_service(ServeDir::new(static_dir).append_index_html_on_directories(true))
         .layer(DefaultBodyLimit::max(12 * 1024 * 1024))
         .with_state(Arc::new(state));
@@ -77,7 +80,8 @@ async fn providers(State(_s):State<Arc<ServerState>>,h:HeaderMap)->ApiResult<Val
       {"id":"hermes","label":"Hermes","type":"cli","needs":[]},
       {"id":"minimax","label":"MiniMax Code","type":"cli","needs":[]},
       {"id":"orca","label":"Orca","type":"orchestrator","needs":["orca_repo_id","orca_agent"]},
-      {"id":"multica","label":"Multica","type":"issue","needs":["multica_workspace_id","multica_project_id","multica_assignee"]}
+      {"id":"multica","label":"Multica","type":"issue","needs":["multica_workspace_id","multica_project_id","multica_assignee"]},
+      {"id":"star","label":"STAR","type":"rest_webhook","needs":["star_project_id"]}
     ])))
 }
 async fn nodes(State(s):State<Arc<ServerState>>,h:HeaderMap)->ApiResult<Value>{
@@ -222,9 +226,14 @@ async fn finish(State(s):State<Arc<ServerState>>,h:HeaderMap,Path(id):Path<Strin
     auth(&h,&s.worker_token)?;
     if !["completed","failed","dispatched","cancelled"].contains(&f.status.as_str()){return Err(err(StatusCode::BAD_REQUEST,"invalid completion status"))}
     let result=sqlx::query("UPDATE tasks SET state=CASE WHEN state='cancelling' THEN 'cancelled' ELSE ? END,output=?,error=?,finished_at=?,lease_until=NULL WHERE id=? AND assigned_node=? AND state IN ('running','cancelling')")
-        .bind(f.status).bind(f.output.chars().take(100_000).collect::<String>()).bind(f.error).bind(now())
-        .bind(id).bind(f.node_id).execute(&s.pool).await.map_err(internal)?;
+        .bind(&f.status).bind(f.output.chars().take(100_000).collect::<String>()).bind(&f.error).bind(now())
+        .bind(&id).bind(f.node_id).execute(&s.pool).await.map_err(internal)?;
     if result.rows_affected()==0{return Err(err(StatusCode::CONFLICT,"task does not belong to worker"))}
+    if matches!(f.status.as_str(), "completed"|"dispatched") {
+        if let Err(e)=crate::rag::capture_task_if_opted(&s.pool,&id).await {
+            if e!="RAG capture not opted in" {tracing::warn!(task_id=%id,error=%e,"RAG draft capture skipped")}
+        }
+    }
     Ok(Json(json!({"ok":true})))
 }
 

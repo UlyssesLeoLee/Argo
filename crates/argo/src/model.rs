@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-pub const SUPPORTED: [&str; 6] = ["claude", "codex", "hermes", "orca", "minimax", "multica"];
+pub const SUPPORTED: [&str; 7] = ["claude", "codex", "hermes", "orca", "minimax", "multica", "star"];
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Attachment { pub name: String, pub sha256: String }
@@ -101,10 +101,22 @@ pub fn validate(t: &NewTask) -> Result<(), String> {
     for v in [&t.model, &t.target_node, &t.repo_alias] {
         if v.as_deref().is_some_and(|s| s.len() > 160 || s.contains('\0')) { return Err("invalid selector".into()); }
     }
+    // The source machine owns repository files; cross-node edits are rejected until
+    // a reviewed patch/snapshot reconciliation protocol is implemented.
+    if t.repo_alias.is_some() {
+        if let Some(owner)=ctx(&t.context,"argo_file_owner") {
+            if t.target_node.as_deref()!=Some(owner) {return Err("file-owner and executor must match for repository edits".into());}
+        }
+    }
+    if let Some(scope)=ctx(&t.context,"argo_file_scope") {
+        if scope.starts_with('/') || scope.starts_with('\\') || scope.contains('\\') || scope.contains('\0')
+          || scope.split('/').any(|p| p==".." || p==".") || (scope.len()>1 && scope.as_bytes()[1]==b':') {return Err("invalid relative file scope".into());}
+    }
     if t.provider == "orca" && ctx(&t.context,"argo_action") != Some("discover_repos") {
         needed(&t.context, "orca_repo_id")?;
         needed(&t.context, "orca_agent")?;
     }
+    if t.provider == "star" {needed(&t.context,"star_project_id")?; if ctx(&t.context,"star_mode")==Some("existing") {needed(&t.context,"star_ticket_id")?;} }
     if t.provider == "multica" {
         needed(&t.context, "multica_workspace_id")?;
         if ctx(&t.context,"multica_mode")==Some("existing") && !has(&t.context,"multica_issue_id") { return Err("existing multica issue id is required".into()); }
@@ -154,13 +166,15 @@ pub fn invocation(task: &TaskRow, prompt_path: &str) -> Result<Invocation, Strin
         }
         "hermes" => {
             program = "hermes";
-            args = vec!["chat".into(), "--query-file".into(), prompt_path.into(), "--oneshot".into()];
+            args = vec!["chat".into(), "--query-file".into(), prompt_path.into(), "--quiet".into()];
             if let Some(model) = &task.model { args.extend(["--model".into(),model.clone()]); }
             acceptance_only = false;
         }
         "minimax" => {
-            program = "mcode";
-            args = vec!["exec".into(), task.prompt.clone()];
+            // MiniMax is the model provider; Hermes serves as the local tool-capable executor.
+            // Do not assume a vendor-specific `mcode` executable exists.
+            program = "hermes";
+            args = vec!["chat".into(), "--provider".into(), "minimax".into(), "--query-file".into(), prompt_path.into(), "--quiet".into()];
             if let Some(model) = &task.model { args.extend(["--model".into(),model.clone()]); }
             acceptance_only = false;
         }
@@ -173,6 +187,7 @@ pub fn invocation(task: &TaskRow, prompt_path: &str) -> Result<Invocation, Strin
             // Orca CLI creates/launches a worktree+agent; the command's exit is not model completion.
             acceptance_only = true;
         }
+        "star" => return Err("STAR is a REST integration, not a CLI executable; worker must use its dedicated adapter".into()),
         "multica" => {
             program = "multica";
             let prefix=vec!["--workspace-id".into(),ctx(&c,"multica_workspace_id").ok_or("workspace id missing")?.to_string()];

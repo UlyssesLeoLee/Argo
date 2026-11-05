@@ -1,0 +1,105 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 900" width="1440" height="900"><defs><pattern id="dots" width="10" height="10" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1.1" fill="#CDB58A" opacity=".22"/></pattern></defs>
+<rect x="0" y="0" width="1440" height="900" rx="0" fill="#FAF8F3" stroke="#FAF8F3" stroke-width="0"/>
+<rect x="0" y="0" width="1440" height="64" rx="0" fill="#FFFDF9" stroke="#DDD9D1" stroke-width="1"/>
+<rect x="0" y="64" width="198" height="836" rx="0" fill="#F3F1E9" stroke="#E1DED6" stroke-width="1"/>
+<rect x="22" y="13" width="43" height="43" rx="13" fill="#FFFDF9" stroke="#243B54" stroke-width="2.6"/>
+<text x="34" y="44" font-size="28" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-weight="800" font-style="normal" fill="#243B54">A</text>
+<text x="79" y="42" font-size="29" font-family="Georgia,'Times New Roman',serif" font-weight="700" font-style="italic" fill="#243B54">Argo</text>
+<text x="235" y="41" font-size="15" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-weight="600" font-style="normal" fill="#243B54">▣   项目   IDE1.0   ▾</text>
+<circle cx="1136" cy="32" r="6" fill="#6BA46C"/>
+<text x="1151" y="38" font-size="13" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-weight="600" font-style="normal" fill="#6A7782">集群在线 · 3 台</text>
+<text x="1347" y="39" font-size="16" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-weight="500" font-style="normal" fill="#243B54">—  □  ×</text>
+<text x="33" y="133" font-size="18" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-weight="700" font-style="normal" fill="#243B54">▸</text>
+<text x="67" y="133" font-size="15" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-weight="400" font-style="normal" fill="#243B54">执行任务</text>
+<text x="33" y="193" font-size="18" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-weight="700" font-style="normal" fill="#243B54">▤</text>
+<text x="67" y="193" font-size="15" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-weight="400" font-style="normal" fill="#243B54">任务记录</text>
+<text x="33" y="253" font-size="18" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-weight="700" font-style="normal" fill="#243B54">▣</text>
+<text x="67" y="253" font-size="15" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-weight="400" font-style="normal" fill="#243B54">机器与集群</text>
+<rect x="15" y="283" width="168" height="44" rx="10" fill="#DCE9C1" stroke="#243B54" stroke-width="1.4"/>
+<text x="33" y="313" font-size="18" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-weight="700" font-style="normal" fill="#243B54">▦</text>
+<text x="67" y="313" font-size="15" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-weight="700" font-style="normal" fill="#243B54">个人 RAG</text>
+<text x="33" y="373" font-size="18" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-weight="700" font-style="normal" fill="#243B54">⚙</text>
+<text x="67" y="373" font-size="15" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-weight="400" font-style="normal" fill="#243B54">设置</text>
+<text x="26" y="867" font-size="12" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-weight="600" font-style="normal" fill="#6A7782">ARGO · v0.3</text>
+<line x1="15" y1="842" x2="183" y2="842" stroke="#CBD0CC" stroke-width="1"/>
+<text x="237" y="110" font-size="26" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-weight="700" font-style="normal" fill="#243B54">个人 RAG</text>
+<text x="238" y="138" font-size="12" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-weight="400" font-style="normal" fill="#6A7782">跨 Agent 上下文归档、检索、审核与复用；连接任何兼容的外部 RAG 服务。</text>
+<rect x="236" y="167" width="286" height="91" rx="12" fill="#FFFDF9" stroke="#CBD0CC" stroke-width="1.3"/>
+<text x="256" y="200" font-size="13" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-weight="400" font-style="normal" fill="#6A7782">知识片段</text>
+<text x="256" y="236" font-size="26" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-weight="700" font-style="normal" fill="#243B54">2,841</text>
+<rect x="535" y="167" width="286" height="91" rx="12" fill="#FFFDF9" stroke="#CBD0CC" stroke-width="1.3"/>
+<text x="555" y="200" font-size="13" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-weight="400" font-style="normal" fill="#6A7782">待审核</text>
+<text x="555" y="236" font-size="26" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-weight="700" font-style="normal" fill="#243B54">27</text>
+<rect x="834" y="167" width="286" height="91" rx="12" fill="#FFFDF9" stroke="#CBD0CC" stroke-width="1.3"/>
+<text x="854" y="200" font-size="13" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-weight="400" font-style="normal" fill="#6A7782">待入库</text>
+<text x="854" y="236" font-size="26" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-weight="700" font-style="normal" fill="#243B54">12</text>
+<rect x="1133" y="167" width="286" height="91" rx="12" fill="#FFFDF9" stroke="#CBD0CC" stroke-width="1.3"/>
+<text x="1153" y="200" font-size="13" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-weight="400" font-style="normal" fill="#6A7782">知识库连接</text>
+<text x="1153" y="236" font-size="20" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-weight="700" font-style="normal" fill="#243B54">已配置</text>
+<rect x="236" y="277" width="1177" height="58" rx="12" fill="#FCFCF8" stroke="#CBD0CC" stroke-width="1.2"/>
+<text x="256" y="313" font-size="18" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-weight="700" font-style="normal" fill="#243B54">✦  AI 智能整理</text>
+<text x="457" y="313" font-size="13" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-weight="400" font-style="normal" fill="#6A7782">自动标签 · 自动摘要 · 结构提取 · 全库批量改写</text>
+<text x="1360" y="313" font-size="20" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-weight="400" font-style="normal" fill="#6A7782">⌄</text>
+<rect x="236" y="354" width="160" height="441" rx="12" fill="#FFFDF9" stroke="#CBD0CC" stroke-width="1.2"/>
+<text x="255" y="389" font-size="17" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-weight="700" font-style="normal" fill="#243B54">筛选</text>
+<rect x="246" y="392" width="137" height="48" rx="9" fill="#DCE9C1" stroke="#CBD0CC" stroke-width="1"/>
+<text x="257" y="420" font-size="13" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-weight="600" font-style="normal" fill="#243B54">全部片段</text>
+<text x="358" y="420" font-size="11" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-weight="400" font-style="normal" fill="#6A7782">2841</text>
+<text x="257" y="483" font-size="13" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-weight="400" font-style="normal" fill="#243B54">待审核</text>
+<text x="358" y="483" font-size="11" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-weight="400" font-style="normal" fill="#6A7782">27</text>
+<text x="257" y="546" font-size="13" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-weight="400" font-style="normal" fill="#243B54">已批准</text>
+<text x="358" y="546" font-size="11" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-weight="400" font-style="normal" fill="#6A7782">1932</text>
+<text x="257" y="609" font-size="13" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-weight="400" font-style="normal" fill="#243B54">已入库</text>
+<text x="358" y="609" font-size="11" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-weight="400" font-style="normal" fill="#6A7782">870</text>
+<text x="257" y="672" font-size="13" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-weight="400" font-style="normal" fill="#243B54">已归档</text>
+<text x="358" y="672" font-size="11" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-weight="400" font-style="normal" fill="#6A7782">339</text>
+<rect x="410" y="354" width="510" height="442" rx="12" fill="#FFFDF9" stroke="#CBD0CC" stroke-width="1.2"/>
+<rect x="430" y="372" width="463" height="44" rx="9" fill="#FFFDF9" stroke="#CBD0CC" stroke-width="1"/>
+<text x="446" y="400" font-size="14" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-weight="400" font-style="normal" fill="#9A9EA3">⌕  搜索内容、标签和来源…</text>
+<text x="435" y="442" font-size="12" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-weight="400" font-style="normal" fill="#6A7782">来源: 全部 Agent    ·    状态: 全部    ·    项目: 全部</text>
+<rect x="427" y="459" width="478" height="70" rx="9" fill="#F2F6E9" stroke="#243B54" stroke-width="1.6"/>
+<rect x="443" y="482" width="17" height="17" rx="4" fill="#FFFDF9" stroke="#CBD0CC" stroke-width="1"/>
+<text x="471" y="486" font-size="14" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-weight="700" font-style="normal" fill="#243B54">Argo 多 Agent 调度原则</text>
+<text x="471" y="508" font-size="11" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-weight="400" font-style="normal" fill="#6A7782">任务拆分与节点调度应独立管理…</text>
+<text x="774" y="485" font-size="11" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-weight="400" font-style="normal" fill="#52866D">Claude · 已入库</text>
+<rect x="427" y="538" width="478" height="70" rx="9" fill="#FFFDF9" stroke="#CBD0CC" stroke-width="1"/>
+<rect x="443" y="561" width="17" height="17" rx="4" fill="#FFFDF9" stroke="#CBD0CC" stroke-width="1"/>
+<text x="471" y="565" font-size="14" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-weight="700" font-style="normal" fill="#243B54">STAR API 接入契约</text>
+<text x="471" y="587" font-size="11" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-weight="400" font-style="normal" fill="#6A7782">使用独立的服务端 REST 接口派发任务…</text>
+<text x="774" y="564" font-size="11" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-weight="400" font-style="normal" fill="#52866D">STAR · 待审核</text>
+<rect x="427" y="617" width="478" height="70" rx="9" fill="#FFFDF9" stroke="#CBD0CC" stroke-width="1"/>
+<rect x="443" y="640" width="17" height="17" rx="4" fill="#FFFDF9" stroke="#CBD0CC" stroke-width="1"/>
+<text x="471" y="644" font-size="14" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-weight="700" font-style="normal" fill="#243B54">Orca Worktree 隔离</text>
+<text x="471" y="666" font-size="11" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-weight="400" font-style="normal" fill="#6A7782">Worktree 与任务生命周期分开跟踪…</text>
+<text x="774" y="643" font-size="11" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-weight="400" font-style="normal" fill="#52866D">Orca · 已批准</text>
+<rect x="427" y="696" width="478" height="70" rx="9" fill="#FFFDF9" stroke="#CBD0CC" stroke-width="1"/>
+<rect x="443" y="719" width="17" height="17" rx="4" fill="#FFFDF9" stroke="#CBD0CC" stroke-width="1"/>
+<text x="471" y="723" font-size="14" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-weight="700" font-style="normal" fill="#243B54">个人记忆筛选与来源</text>
+<text x="471" y="745" font-size="11" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-weight="400" font-style="normal" fill="#6A7782">跨 Agent 的记忆入库必须追溯来源…</text>
+<text x="774" y="722" font-size="11" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-weight="400" font-style="normal" fill="#52866D">Codex · 已入库</text>
+<rect x="938" y="354" width="475" height="442" rx="12" fill="#FFFDF9" stroke="#243B54" stroke-width="1.6"/>
+<text x="957" y="390" font-size="19" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-weight="700" font-style="normal" fill="#243B54">记忆详情</text>
+<text x="1244" y="390" font-size="12" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-weight="400" font-style="normal" fill="#558868">已批准 · v3</text>
+<line x1="958" y1="403" x2="1390" y2="403" stroke="#CBD0CC" stroke-width="1"/>
+<text x="958" y="440" font-size="17" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-weight="700" font-style="normal" fill="#243B54">Argo 多 Agent 调度原则</text>
+<text x="958" y="468" font-size="12" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-weight="400" font-style="normal" fill="#6A7782">来源 Claude · 项目 Argo · 2026-11-05</text>
+<text x="958" y="509" font-size="13" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-weight="700" font-style="normal" fill="#243B54">标签</text>
+<rect x="958" y="520" width="81" height="34" rx="10" fill="#FFFDF9" stroke="#CBD0CC" stroke-width="1"/>
+<text x="971" y="542" font-size="14" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-weight="400" font-style="normal" fill="#243B54">架构</text>
+<rect x="1048" y="520" width="81" height="34" rx="10" fill="#FFFDF9" stroke="#CBD0CC" stroke-width="1"/>
+<text x="1061" y="542" font-size="14" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-weight="400" font-style="normal" fill="#243B54">调度</text>
+<rect x="1138" y="520" width="81" height="34" rx="10" fill="#FFFDF9" stroke="#CBD0CC" stroke-width="1"/>
+<text x="1151" y="542" font-size="14" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-weight="400" font-style="normal" fill="#243B54">上下文</text>
+<rect x="958" y="573" width="433" height="125" rx="9" fill="#F8F8F5" stroke="#CBD0CC" stroke-width="1"/>
+<text x="971" y="601" font-size="13" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-weight="400" font-style="normal" fill="#243B54">1. 任务和执行机器独立建模。</text>
+<text x="971" y="629" font-size="13" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-weight="400" font-style="normal" fill="#243B54">2. 文件机器、仓库和路径保持隶属。</text>
+<text x="971" y="657" font-size="13" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-weight="400" font-style="normal" fill="#243B54">3. 所有记忆须审核后才可远端同步。</text>
+<rect x="959" y="725" width="103" height="34" rx="10" fill="#FFFDF9" stroke="#CBD0CC" stroke-width="1"/>
+<text x="972" y="747" font-size="14" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-weight="400" font-style="normal" fill="#243B54">保存</text>
+<rect x="1074" y="725" width="103" height="34" rx="10" fill="#FFFDF9" stroke="#CBD0CC" stroke-width="1"/>
+<text x="1087" y="747" font-size="14" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-weight="400" font-style="normal" fill="#243B54">审核</text>
+<rect x="1190" y="725" width="164" height="34" rx="10" fill="#FFFDF9" stroke="#CBD0CC" stroke-width="1"/>
+<text x="1203" y="747" font-size="14" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-weight="400" font-style="normal" fill="#243B54">版本历史</text>
+<rect x="236" y="821" width="1176" height="47" rx="10" fill="#FFFDF9" stroke="#CBD0CC" stroke-width="1"/>
+<text x="255" y="851" font-size="13" font-family="'Noto Sans CJK SC','Microsoft YaHei',Arial,sans-serif" font-weight="400" font-style="normal" fill="#6A7782">知识流程     采集  →  分段  →  AI 预处理  →  人工审核  →  本地归档  →  外部 RAG 同步</text>
+</svg>

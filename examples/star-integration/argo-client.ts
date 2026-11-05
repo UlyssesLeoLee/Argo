@@ -83,3 +83,25 @@ export const getArgoTask = (id: string) => argo<ArgoTask>(`/api/v1/tasks/${encod
 export const listArgoEvents = (id: string, since = 0) => argo<ArgoEvent[]>(`/api/v1/tasks/${encodeURIComponent(id)}/events?since=${Math.max(0, since)}`);
 export const submitArgoTask = (task: ArgoTaskInput) => argo<{id: string;state: 'queued'}>('/api/v1/tasks', {method: 'POST', body: JSON.stringify(task)});
 export const cancelArgoTask = (id: string) => argo<{ok: true}>(`/api/v1/tasks/${encodeURIComponent(id)}/cancel`, {method: 'POST', body: '{}'});
+
+
+// Personal RAG API (server-only; caller must enforce project ownership).
+export interface ArgoRagChunk {
+  id: string; source_key: string; source_kind: string; provider: string; project: string;
+  task_id?: string | null; title: string; content: string; tags_json: string;
+  status: 'draft'|'approved'|'synced'|'archived'; revision: number; remote_id?: string | null;
+}
+export interface ArgoRagIngest {
+  source_key: string; source_kind: string; provider: string; project: string;
+  title: string; content: string; tags?: string[]; task_id?: string;
+}
+export const getArgoRagStatus = () => argo<{total:number;draft:number;approved:number;remote_configured:boolean}>('/api/v1/rag/status');
+export const listArgoRag = (params: {query?:string;provider?:string;project?:string;status?:string} = {}) => {
+  const query=new URLSearchParams(params as Record<string,string>);
+  return argo<ArgoRagChunk[]>(`/api/v1/rag/chunks?${query}`);
+};
+export const ingestArgoRag = (item:ArgoRagIngest) => argo<{chunk_ids:string[];status:'draft'}>('/api/v1/rag/chunks',{method:'POST',body:JSON.stringify(item)});
+export const reviewArgoRag = (id:string,data:{revision:number;status?:'draft'|'approved'|'archived';title?:string;content?:string;tags?:string[]}) => argo<{ok:boolean}>(`/api/v1/rag/chunks/${encodeURIComponent(id)}`,{method:'PATCH',body:JSON.stringify(data)});
+export const linkArgoRag = (id:string,target_id:string,relation:'related'|'supersedes'|'depends_on'|'derived_from') => argo<{ok:boolean}>(`/api/v1/rag/chunks/${encodeURIComponent(id)}/links`,{method:'POST',body:JSON.stringify({target_id,relation})});
+export const syncArgoRag = (ids:string[]) => argo<{synced:string[];failed:Array<{id:string;error:string}>}>('/api/v1/rag/sync',{method:'POST',body:JSON.stringify({ids})});
+export const searchVercelArgoRag = (query:string,project?:string,provider?:string,limit=8) => argo<{results:ArgoRagChunk[];mode:string}>('/api/v1/rag/remote-search',{method:'POST',body:JSON.stringify({query,project,provider,limit})});

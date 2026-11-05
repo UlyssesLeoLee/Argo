@@ -1,82 +1,34 @@
-<!doctype html>
-<html lang="zh-CN">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="theme-color" content="#0b1221" />
-  <meta name="description" content="Argo — 多平台、多节点 AI Agent 任务控制台" />
-  <title>Argo · Agent Cluster Console</title>
-  <link rel="stylesheet" href="/style.css" />
-</head>
-<body>
-<div class="shell">
-  <aside class="rail">
-    <div class="monogram" aria-label="Argo">A<span>·</span></div>
-    <div class="rail-menu">
-      <button type="button" class="rail-button selected" data-tab="compose" title="统一输入" aria-label="统一输入"><span>✦</span></button>
-      <button type="button" class="rail-button" data-tab="runs" title="执行记录" aria-label="执行记录"><span>◫</span></button>
-      <button type="button" class="rail-button" data-tab="nodes" title="计算节点" aria-label="计算节点"><span>⬡</span></button>
-      <button type="button" class="rail-button" data-tab="settings" title="连接设置" aria-label="连接设置"><span>⚙</span></button>
-    </div>
-    <div class="rail-bottom"><span class="rail-dot"></span><span class="rail-v">v0.1</span></div>
-  </aside>
-  <div class="app">
-    <header class="topbar">
-      <div class="brand"><b>ARGO</b><span class="brand-divider"></span><span>Agent Cluster Runtime</span></div>
-      <div class="top-actions">
-        <div class="env-chip"><span class="pulse"></span><span id="connectionStatus">未连接</span></div>
-        <span class="top-separator"></span>
-        <button type="button" id="refreshAll" class="plain-btn" title="刷新全部">⟳ <span>刷新</span></button>
-        <button type="button" id="themeButton" class="icon-btn" title="切换主题">◐</button>
-        <div class="avatar">AR</div>
-      </div>
-    </header>
-    <div class="page">
-      <section id="tab-compose" class="tab-screen active">
-        <div class="section-head"><div><div class="eyebrow">DISTRIBUTED AGENT WORKSPACE <span class="eyebrow-line"></span> 01</div><h1>将任务交给合适的 <em>Agent.</em></h1><p>一次输入，自动适配平台协议，并由集群中的目标计算机执行。</p></div><button class="subtle-btn" id="openDocs">查看接入规范 ↗</button></div>
-        <div class="workspace-grid">
-          <div class="main-stack">
-            <div class="surface provider-surface">
-              <div class="surface-title"><div><span class="section-number">01</span><h2>选择执行平台</h2></div><span class="tiny-note">共 6 个适配器</span></div>
-              <div id="providers" class="provider-grid" role="radiogroup" aria-label="执行平台"></div>
-            </div>
-            <div class="surface composer-surface">
-              <div class="surface-title"><div><span class="section-number">02</span><h2>任务编排</h2></div><span class="tiny-note" id="providerHint">CLI · 非交互式执行</span></div>
-              <label class="field-label" for="taskTitle">任务标题 <span>必填</span></label>
-              <input type="text" id="taskTitle" maxlength="200" placeholder="例如：审查登录模块并补充回归测试" autocomplete="off" />
-              <div class="field-spacer"></div>
-              <label class="field-label" for="taskPrompt">统一指令 <span>平台适配器将保留原始内容</span></label>
-              <div class="prompt-frame"><textarea id="taskPrompt" maxlength="120000" rows="8" placeholder="描述预期目标、修改范围、验收标准、可执行的测试等……"></textarea><div class="prompt-bottom"><span id="charCount">0 字</span><span><kbd>Ctrl</kbd> + <kbd>Enter</kbd> 提交</span></div></div>
-              <div id="contextFields" class="context-fields"></div>
-              <div class="field-spacer"></div>
-              <div class="two-col">
-                <div><label class="field-label" for="modelSelect">模型标识 <span>可选</span></label><input type="text" id="modelSelect" placeholder="使用平台默认模型" /></div>
-                <div><label class="field-label" for="repoAlias">工作仓库 <span>可选</span></label><select id="repoAlias"><option value="">独立工作空间 / 无仓库</option></select></div>
-              </div>
-              <div class="two-col secondary-options">
-                <div><label class="field-label" for="nodeSelect">执行机器</label><select id="nodeSelect"><option value="">自动调度 · Auto</option></select></div>
-                <div><label class="field-label" for="prioritySelect">执行策略</label><select id="prioritySelect"><option value="safe">独立工作区（非 OS 沙箱）</option></select></div>
-              </div>
-              <div class="attach-area" id="dropArea" tabindex="0" role="button" aria-label="选择文件"><span class="attach-symbol">＋</span><div><strong>添加任务资料</strong><span>拖放或点击 · 每个文件上限 10 MB · 最多 20 个</span></div><input type="file" id="attachmentPicker" multiple hidden /></div>
-              <div id="attachmentList" class="attachment-list"></div>
-              <div id="formError" class="form-error" role="alert" hidden></div>
-              <div class="composer-actions"><div class="safety-tip"><span>◇</span> 所有任务在节点侧独立执行，不共享主工作目录</div><button type="button" id="submitTask" class="primary-btn"><span>发送到集群</span><b>↗</b></button></div>
-            </div>
-          </div>
-          <aside class="side-stack">
-            <div class="surface cluster-card"><div class="surface-title"><div><span class="section-number">03</span><h2>集群概览</h2></div><span class="live-label">LIVE</span></div><div class="cluster-metrics"><div><strong id="nodeCount">—</strong><span>在线节点</span></div><div><strong id="runningCount">—</strong><span>进行中</span></div><div><strong id="queueCount">—</strong><span>待调度</span></div></div><div class="thin-divider"></div><div id="miniNodes" class="mini-nodes"><div class="empty-muted">连接 Daemon 后显示节点</div></div><button type="button" class="text-action" data-switch="nodes">查看所有计算节点 <span>↗</span></button></div>
-            <div class="surface activity-card"><div class="surface-title"><div><span class="section-number">04</span><h2>最近执行</h2></div><button type="button" class="quiet-link" data-switch="runs">全部</button></div><div id="recentRuns" class="recent-runs"><div class="empty-muted">暂无任务</div></div></div>
-            <div class="note-card"><div class="note-symbol">↗</div><h3>统一入口，异构执行。</h3><p>Claude / Codex / Hermes / MiniMax 直接运行 CLI；Orca 管理 Worktree；Multica 创建或关联任务卡。</p><span>ARGO / ADAPTER CONTRACT V1</span></div>
-          </aside>
-        </div>
-      </section>
-      <section id="tab-runs" class="tab-screen"><div class="section-head"><div><div class="eyebrow">RUNS / TELEMETRY</div><h1>任务执行与输出</h1><p>查看各节点的任务状态、标准输出、错误输出与派发回执。</p></div><button class="subtle-btn" id="refreshRuns">⟳ 刷新记录</button></div><div class="runs-layout"><div class="surface run-list-card"><div class="surface-title"><h2>执行记录</h2><select id="runFilter"><option value="all">所有状态</option><option value="running">运行中</option><option value="queued">队列中</option><option value="completed">已完成</option><option value="failed">失败</option><option value="dispatched">已派发</option></select></div><div id="runsList" class="run-list"></div></div><div class="surface run-detail-card"><div class="surface-title"><h2>执行详情</h2><button type="button" id="cancelTask" class="danger-btn" hidden>取消任务</button></div><div id="runDetail"><div class="empty-illustration">↗</div><p class="empty-center">选择左侧任务，查看输出与事件日志</p></div></div></div></section>
-      <section id="tab-nodes" class="tab-screen"><div class="section-head"><div><div class="eyebrow">CLUSTER / MACHINES</div><h1>集群节点管理</h1><p>每台机器运行 Argo Rust Daemon，并通过 HTTPS 主动领取任务。</p></div><button class="subtle-btn" id="refreshNodes">⟳ 刷新节点</button></div><div class="node-summary"><div><b id="allNodeCount">0</b><span>注册节点</span></div><div><b id="allOnlineCount">0</b><span>在线节点</span></div><div><b id="allAdapterCount">0</b><span>可用适配器实例</span></div></div><div id="nodesGrid" class="nodes-grid"></div><div class="surface info-panel"><h2>新增计算节点</h2><p>在其他电脑安装同一套 Argo Rust Runtime，设置 <code>ARGO_SERVER</code>、<code>ARGO_WORKER_TOKEN</code>、<code>ARGO_NODE_ID</code>，启动 <code>worker</code>。节点主动注册，无需让节点对公网开放监听端口。</p></div></section>
-      <section id="tab-settings" class="tab-screen"><div class="section-head"><div><div class="eyebrow">CONNECTION / CONFIGURATION</div><h1>连接与安全</h1><p>Argo 可独立部署，也可作为 Star 中的一个 Agent 运行中心。</p></div></div><div class="settings-layout"><div class="surface settings-card"><h2>API 访问</h2><p>浏览器只保存本次会话的访问令牌，不上传第三方平台 API Key。</p><label class="field-label" for="accessToken">Argo Admin Token</label><input id="accessToken" type="password" placeholder="粘贴 ARGO_ADMIN_TOKEN" autocomplete="off" /><div class="settings-actions"><button id="connectButton" class="primary-btn">连接控制面 →</button><button id="disconnectButton" class="subtle-btn">断开并清除</button></div><div class="thin-divider"></div><p class="settings-foot">控制面地址：<code id="apiEndpoint"></code>。远程访问必须配 HTTPS、反向代理与身份认证；不要通过公网直接暴露演示配置。</p></div><div class="surface settings-card"><h2>运行模式</h2><div class="switch-line"><div><strong>演示模式</strong><p>无需 Rust 服务与外部 CLI，可测试完整界面交互流程。</p></div><span id="demoIndicator" class="state-tag">关闭</span></div><div class="thin-divider"></div><h2>Star 集成</h2><p>通过 Star 的服务端 Proxy 对接 Argo REST API；不要向终端用户暴露 Worker Token 或第三方 CLI 凭据。</p><code class="code-line">GET /api/v1/nodes</code><code class="code-line">POST /api/v1/tasks</code><code class="code-line">GET /api/v1/tasks/:id/events</code></div></div></section>
-    </div>
-    <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  </div>
-</div>
-<script type="module" src="/app.mjs"></script>
-</body>
-</html>
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#faf6ed"><title>Argo · Agent / Memory</title><meta name="description" content="Argo - 轻量多节点 Agent 编排与个人上下文管理"><link rel="stylesheet" href="./style.css"></head>
+<body><div class="window-shell"><header class="chrome"><span class="brandmark"><img src="./assets/argo-mark.svg" alt="Argo Logo" width="38" height="38"></span><div class="chrome-title"><b>Argo</b><small>AGENT & MEMORY RUNTIME</small></div><div class="chrome-project">项目 <strong id="projectName">IDE1.0</strong><span>⌄</span></div><div class="chrome-spacer"></div><span class="cluster-dot"></span><span class="cluster-label" id="connectionLabel">演示集群 · 3 台</span><button class="icon-plain" id="helpButton" title="使用说明" aria-label="使用说明">?</button></header>
+<div class="app-body"><nav class="nav"><div class="nav-kicker">WORKSPACE</div><button class="nav-item active" data-page="compose"><span class="nav-icon">✦</span><span>执行任务</span></button><button class="nav-item" data-page="runs"><span class="nav-icon">▤</span><span>任务记录</span></button><button class="nav-item" data-page="rag"><span class="nav-icon">▣</span><span>个人 RAG</span><span class="nav-dot"></span></button><button class="nav-item" data-page="nodes"><span class="nav-icon">⬡</span><span>机器与集群</span></button><button class="nav-item" data-page="settings"><span class="nav-icon">⚙</span><span>设置</span></button><div class="nav-spacer"></div><div class="nav-footer"><span>ARGO · v0.3</span><small>AGENT / MEMORY</small></div></nav>
+<main id="main">
+<section class="screen active" id="screen-compose"><div class="page-heading"><div><div class="eyebrow">EXECUTION · 执行任务</div><h1>选择 Agent，明确文件目标。</h1><p>选择一个 Agent，确认文件所在机器，输入任务即可。</p></div></div>
+<div class="agent-tabs" role="tablist" id="agentTabs" aria-label="Agent 平台"></div>
+<div class="mission-layout"><div class="panel input-panel"><div class="panel-header"><div><span class="panel-step">01</span><strong id="agentTitle">Claude</strong><small id="agentSubtitle">CLI · 独立运行</small></div><span class="soft-pill" id="agentKind">CLI</span></div>
+<div class="provider-settings" id="providerFields"></div>
+<label class="field-label" for="prompt">任务指令 <span>必填</span></label><textarea id="prompt" class="prompt" placeholder="告诉 Agent 需要做什么，例如：检查登录流程，修复缺陷并补充测试。" rows="7"></textarea>
+<div class="prompt-footer"><button class="text-button" id="ragAttach">▣ 引用 RAG</button><span class="muted-caption" id="selectedRagCount">未引用上下文</span><span class="flex1"></span><span class="muted-caption" id="promptCount">0 字</span></div>
+<details class="accordion"><summary>⚙ 高级设置 <span>模型 · 权限 · 审查 · 上下文采集</span></summary><div class="accordion-content"><div class="form-grid"><label>模型标识 <input id="modelInput" placeholder="平台默认" autocomplete="off"></label><label>任务标题 <input id="taskTitle" placeholder="自动从任务描述生成" autocomplete="off"></label></div><div class="toggle-row"><label><input type="checkbox" id="captureCheck"> 将任务输入与输出分段保存为 RAG 草稿</label><small>需人工审核后才会同步云端</small></div></div></details>
+<div id="composeError" class="error-inline" hidden></div></div>
+<div class="right-col"><div class="panel file-panel"><div class="panel-header"><div><span class="panel-step">02</span><strong>目标文件</strong><small>机器 → 仓库 → 路径</small></div><span class="soft-pill">FILE TARGET</span></div><label class="field-label" for="fileMachine">文件所在机器</label><select id="fileMachine"></select><div class="file-tree"><div class="file-branch">└ <span>仓库</span><select id="repoSelect"><option value="">无仓库 · 纯聊天任务</option></select></div><div class="file-branch file-path">└ <span>范围</span><input id="scopePath" placeholder="例如 src/ （相对仓库）"></div></div><p class="context-note">路径始终隶属于上方选中的机器；未选择仓库时不修改项目文件。</p></div>
+<div class="panel execution-panel"><div class="panel-header"><div><span class="panel-step small">03</span><strong>执行节点</strong><small>独立于文件位置</small></div></div><label class="field-label" for="executionMachine">运行 Agent 的机器</label><select id="executionMachine"></select><p class="muted-caption" id="routeHint">默认在文件所在机器执行，避免跨机写入风险。</p></div>
+<button id="runButton" class="run-button"><span>▶</span> 执行任务 <small>DISPATCH</small></button></div></div>
+<div class="output-strip"><button id="toggleOutput" class="output-toggle"><span>⌘</span><strong>执行输出</strong><small id="outputSummary">提交任务后显示执行记录</small><span class="flex1"></span><span>⌄</span></button><div class="output-content" id="outputContent" hidden>尚无输出。</div></div></section>
+<section class="screen" id="screen-rag"><div class="page-heading rag-heading"><div><div class="eyebrow">MEMORY · 个人 RAG</div><h1>个人 RAG <span class="thin-title">/ 跨 Agent 上下文</span></h1><p>整理碎片、验证价值、建立链接，再归档为可检索的长期知识。</p></div><div class="detail-actions"><button class="secondary-btn" id="remoteSearch">⌕ 检索云端</button><button class="secondary-btn" id="importKnowledge">＋ 导入知识</button></div></div>
+<div class="rag-stats"><div><b id="ragTotal">—</b><span>知识片段</span></div><div><b id="ragDraft">—</b><span>待筛选</span></div><div><b id="ragApproved">—</b><span>待入库</span></div><div><span class="cloud-status" id="ragConnected">○ 未连接知识库</span></div></div>
+<details class="ai-preprocess panel" id="aiStudio"><summary><span class="ai-glint">✦</span><strong>AI 智能整理</strong><small>自动标签 · 摘要 · 结构提取 · 批量改写（先预览再应用）</small><span class="flex1"></span><span>⌄</span></summary>
+<div class="ai-studio-body">
+<div class="ai-grid"><label>处理范围<select id="aiScope"><option value="selected">已选择的片段</option><option value="filtered">当前筛选结果</option><option value="all">全库所有记忆</option></select></label><label>处理动作<select id="aiOperation"><option value="tags">自动打标签</option><option value="summary">自动总结</option><option value="structured">结构化提取</option><option value="rewrite">按统一要求改写</option></select></label><label>AI 服务<select id="aiProvider"><option value="openai">OpenAI 兼容接口</option><option value="openrouter">OpenRouter</option><option value="minimax">MiniMax</option><option value="custom">自定义服务端接口</option></select></label><label>模型<input id="aiModel" value="gpt-4.1-mini" placeholder="模型 ID"></label></div>
+<label>统一处理要求（可选）<textarea rows="2" id="aiInstructions" placeholder="例如：每条记忆只保留能够复用的事实、决策、约束；统一标签分类为 架构 / 接口 / 测试 / 问题。"></textarea></label>
+<div class="ai-tool-row"><label class="ai-key">用户 AI API Key（仅本次请求）<input id="aiKey" type="password" autocomplete="off" placeholder="不会存入知识库或持久化设置"></label><button id="aiPreviewButton" class="ink-btn">预览 AI 修改</button><button id="aiApplyButton" class="secondary-btn" disabled>确认应用</button><button id="aiCancelButton" class="text-button" disabled>停止</button></div>
+<div class="ai-result" id="aiPreviewResult" role="status">选择范围后先生成预览，确认后才会改写记忆；已入库的片段修改后会退回待审核。</div>
+</div></details>
+<div class="rag-layout"><aside class="panel rag-categories"><h2>知识分类</h2><button class="category active" data-status="all"><span>◈</span> 全部片段</button><button class="category" data-status="draft"><span>◐</span> 待审核</button><button class="category" data-status="approved"><span>◎</span> 已批准</button><button class="category" data-status="synced"><span>◉</span> 已入库</button><button class="category" data-status="archived"><span>▤</span> 已归档</button><div class="category-foot"><small>数据先保存在本地 SQLite，只有批准的片段可手动同步。</small></div></aside>
+<div class="panel rag-browser"><div class="rag-browser-top"><label class="rag-select-all"><input type="checkbox" id="ragSelectVisible" aria-label="选中当前列表"> 全选</label><label class="search-field"><span>⌕</span><input id="ragSearch" placeholder="搜索内容、标题或标签" aria-label="搜索个人 RAG"></label><select id="ragProviderFilter" aria-label="按 Agent 筛选"><option value="">全部 Agent</option></select><select id="ragProjectFilter" aria-label="按项目筛选"><option value="">全部项目</option></select></div><div class="rag-list" id="ragList"></div></div>
+<aside class="panel rag-detail"><div class="detail-head"><b>片段详情</b><span class="detail-id" id="ragDetailId">选择一条</span></div><div class="rag-inspector-empty" id="ragEmpty">从中间选择片段，查看来源、编辑标签、审核与建立链接。</div><div id="ragInspector" hidden><label>标题<input id="ragEditTitle"></label><div class="detail-meta" id="ragMeta"></div><label>内容<textarea id="ragEditContent" rows="10"></textarea></label><label>标签（逗号分隔）<input id="ragEditTags" placeholder="架构,设计,经验"></label><div class="detail-actions"><button id="ragSave" class="secondary-btn">保存更改</button><button id="ragHistory" class="text-button">版本历史</button><button id="ragApprove" class="ink-btn">✓ 审核通过</button><button id="ragArchive" class="text-button">归档</button></div><div class="detail-separator"></div><label>链接相关片段 ID<input id="ragLinkId" placeholder="rag-... · 可从列表复制"></label><button id="ragLink" class="secondary-btn mini">＋ 建立关联</button><div class="linked-items" id="ragLinks"></div><div class="detail-separator"></div><button id="ragSync" class="sync-btn">↥ 同步到知识库</button><p class="small-muted">仅审核通过可上传；由 Argo 服务端持有远端访问凭据。</p></div></aside></div></section>
+<section class="screen" id="screen-runs"><div class="page-heading"><div><div class="eyebrow">MISSION LOG / 历次航行</div><h1>任务记录</h1><p>统一查看不同 Agent 的任务、派发与执行结果。</p></div><button id="refreshRuns" class="secondary-btn">↻ 刷新</button></div><div class="panel simple-content" id="runsList">尚无任务。</div></section>
+<section class="screen" id="screen-nodes"><div class="page-heading"><div><div class="eyebrow">FLEET / 分布式舰队</div><h1>机器与集群</h1><p>文件归属机器、实际执行机器与可用 Agent 分开管理。</p></div><button id="refreshNodes" class="secondary-btn">↻ 刷新</button></div><div class="node-cards" id="nodesList"></div></section>
+<section class="screen" id="screen-settings"><div class="page-heading"><div><div class="eyebrow">CONFIG / 连接设置</div><h1>连接与权限</h1><p>控制面身份验证、RAG 连接与执行安全。</p></div></div><div class="panel settings-pane"><h2>Argo 控制面</h2><p>演示模式无需服务端；正式模式由本机或你的反向代理提供 HTTPS API。</p><label>Argo Admin Token<input id="adminToken" type="password" autocomplete="off" placeholder="只保存在当前浏览器会话"></label><div class="detail-actions"><button id="connectApi" class="ink-btn">连接</button><button id="disconnectApi" class="secondary-btn">断开</button></div><div class="detail-separator"></div><h2>外部 RAG 连接</h2><p>通过 Rust Controller 环境变量配置任意兼容 HTTPS RAG 服务的入库/检索接口与密钥；也可配置多个连接配置，按个人或团队选择。</p><div class="connector-row"><label>当前连接器<select id="ragConnector"><option value="default">默认知识库</option></select></label><button class="secondary-btn" id="refreshConnectors">刷新连接器</button></div><p class="small-muted" id="connectorExplain">连接状态：尚未检测</p></div></section>
+</main></div></div>
+<dialog id="ragDialog"><form method="dialog" class="dialog-header"><strong id="dialogTitle">导入知识</strong><button aria-label="关闭">✕</button></form><div class="dialog-body" id="dialogBody"></div></dialog>
+<div id="toast" class="toast" role="status" aria-live="polite"></div><script type="module" src="./app.mjs"></script></body></html>

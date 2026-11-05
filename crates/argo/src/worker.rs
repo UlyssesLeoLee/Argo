@@ -29,7 +29,7 @@ impl Worker {
         serde_json::from_str(&txt).map_err(|e|format!("invalid response: {e}"))
     }
     async fn register(&self,max:usize)->Result<(),String>{
-        let providers:Vec<&str>=SUPPORTED.iter().copied().filter(|p|self.demo || has_command(match *p {"minimax"=>"mcode",x=>x})).collect();
+        let providers:Vec<&str>=SUPPORTED.iter().copied().filter(|p|self.demo || (if *p=="star" {std::env::var("ARGO_STAR_DISPATCH_URL").ok().is_some_and(|v|v.starts_with("https://")) && std::env::var("ARGO_STAR_SERVICE_TOKEN").ok().is_some_and(|v|v.len()>=16)} else {has_command(match *p {"minimax"=>"hermes",x=>x})})).collect();
         let val=json!({"id":self.id,"hostname":std::env::var("COMPUTERNAME").or_else(|_|std::env::var("HOSTNAME")).unwrap_or_else(|_|"worker".into()),
         "os":std::env::consts::OS,"providers":providers,"repos":self.repos.keys().collect::<Vec<_>>(),"max_parallel":max});
         self.post("/api/v1/worker/register",val).await.map(|_|())
@@ -123,6 +123,19 @@ async fn execute(w:Worker,t:TaskRow)->Result<(),String>{
         let output=Command::new("git").args(["-C",root.to_str().ok_or("invalid repo path")?,"worktree","add","--detach",cwd.to_str().ok_or("invalid worktree path")?,"HEAD"]).output().await.map_err(|e|e.to_string())?;
         if !output.status.success(){return Err(format!("git worktree creation failed: {}",String::from_utf8_lossy(&output.stderr)))}
     } else {tokio::fs::create_dir_all(&cwd).await.map_err(|e|e.to_string())?}
+    // Scope belongs to the selected repository on this worker. This changes the
+    // process working directory; it is NOT a full OS-level filesystem sandbox.
+    let ctx:Value=serde_json::from_str(&t.context_json).map_err(|e|e.to_string())?;
+    let mut execution_cwd=cwd.clone();
+    if let Some(scope)=ctx.get("argo_file_scope").and_then(Value::as_str).filter(|s|!s.trim().is_empty()) {
+        if t.repo_alias.is_none(){return Err("a repository is required for a file scope".into())}
+        if scope.starts_with('/') || scope.contains('\\') || scope.split('/').any(|x|x==".."||x==".") {return Err("invalid file scope".into())}
+        let requested=cwd.join(scope);
+        let root=tokio::fs::canonicalize(&cwd).await.map_err(|e|e.to_string())?;
+        let resolved=tokio::fs::canonicalize(&requested).await.map_err(|e|format!("file scope must exist inside repository: {e}"))?;
+        if !resolved.starts_with(&root){return Err("file scope escapes task worktree".into())}
+        execution_cwd=if resolved.is_file(){resolved.parent().ok_or("invalid file target")?.to_path_buf()}else{resolved};
+    }
     let mut note=if names.is_empty(){String::new()}else{format!("\n\nFiles attached to this task (local read-only references; do not delete):\n{}",names.iter().map(|x|x.display().to_string()).collect::<Vec<_>>().join("\n"))};
     if !["multica","orca"].contains(&t.provider.as_str()) {
         note.push_str(&format!("\n\nTo return non-Git generated files to the controller, save them in this output directory (max 20 files, 10MiB each): {}",output_dir.display()));
@@ -131,11 +144,28 @@ async fn execute(w:Worker,t:TaskRow)->Result<(),String>{
     let prompt_file=base.join("prompt.md");
     tokio::fs::write(&prompt_file,&normalized.prompt).await.map_err(|e|e.to_string())?;
     let prompt_path=prompt_file.to_str().ok_or("invalid prompt path")?;
+    // STAR is not yet released as a public CLI. Dispatch only to the explicit owner-defined HTTPS webhook.
+    if t.provider=="star" {
+        if w.demo {w.report(&t.id,"system","DEMO · STAR connector simulated; no HTTP sent").await;w.finish(&t.id,"dispatched","DEMO STAR dispatch".into(),None).await;return Ok(())}
+        let url=std::env::var("ARGO_STAR_DISPATCH_URL").map_err(|_|"STAR HTTPS dispatch endpoint is not configured")?;
+        if !url.starts_with("https://") || url.contains('@') {return Err("STAR dispatch URL must be HTTPS".into())}
+        let token=std::env::var("ARGO_STAR_SERVICE_TOKEN").map_err(|_|"STAR service token is not configured")?;
+        if token.len()<16{return Err("STAR service token too short".into())}
+        let payload=json!({"idempotency_key":t.id,"source":"argo","task_id":t.id,"title":t.title,"prompt":normalized.prompt,
+          "project_id":ctx.get("star_project_id"),"ticket_id":ctx.get("star_ticket_id"),"mode":ctx.get("star_mode")});
+        let res=w.client.post(url).bearer_auth(token).json(&payload).send().await.map_err(|_|"STAR dispatch transport failed")?;
+        if !res.status().is_success(){return Err(format!("STAR endpoint rejected: HTTP {}",res.status().as_u16()))}
+        let response:Value=res.json().await.map_err(|_|"STAR JSON acknowledgement missing")?;
+        let remote_id=response.get("id").and_then(Value::as_str).unwrap_or("unverified");
+        w.report(&t.id,"system",&format!("STAR dispatch acknowledged: {remote_id}; delivery does not indicate task completion")).await;
+        w.finish(&t.id,"dispatched",format!("STAR dispatched remote ID: {remote_id}"),None).await;
+        return Ok(())
+    }
     let mut plan=invocation(&normalized,prompt_path)?;
     if t.provider=="multica" && !names.is_empty() && !normalized.context_json.contains("discover_") {
         for attachment in &names {plan.args.extend(["--attachment".to_string(),attachment.to_string_lossy().into_owned()]);}
     }
-    w.report(&t.id,"system",&format!("Node: {} | Adapter: {} | Workspace: {} | Mode: {}",w.id,plan.program,cwd.display(),if plan.acceptance_only{"dispatch"}else{"execute"})).await;
+    w.report(&t.id,"system",&format!("Node: {} | Adapter: {} | Workspace: {} | Mode: {}",w.id,plan.program,execution_cwd.display(),if plan.acceptance_only{"dispatch"}else{"execute"})).await;
     if w.demo {
         for txt in ["Argo demo mode: request validated", "Node received prompt & file manifest", "Adapter would be invoked on the selected machine"] {
             w.report(&t.id,"stdout",txt).await;
@@ -145,7 +175,7 @@ async fn execute(w:Worker,t:TaskRow)->Result<(),String>{
         return Ok(())
     }
     let mut cmd=Command::new(plan.program);
-    cmd.args(&plan.args).current_dir(&cwd).stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped());
+    cmd.args(&plan.args).current_dir(&execution_cwd).stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped());
     // No shell interpolation, no secret forwarding. CLI credentials stay on this worker.
     let mut child=cmd.spawn().map_err(|e|format!("{} launch failed: {e}",plan.program))?;
     let (tx,mut rx)=mpsc::channel::<(String,String)>(128);

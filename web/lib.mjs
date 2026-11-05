@@ -5,7 +5,8 @@ export const PROVIDERS = [
   {id:'hermes',name:'Hermes',symbol:'H',subtitle:'NousResearch CLI',hint:'hermes chat --query-file --oneshot'},
   {id:'orca',name:'Orca',symbol:'◫',subtitle:'Worktree CLI',hint:'orca worktree create · 创建并启动 Agent'},
   {id:'minimax',name:'MiniMax',symbol:'M',subtitle:'MiniMax Code CLI',hint:'mcode exec · 独立 Agent Runtime'},
-  {id:'multica',name:'Multica',symbol:'◇',subtitle:'Workspace / Issue',hint:'multica issue · 项目与任务卡绑定'}
+  {id:'multica',name:'Multica',symbol:'◇',subtitle:'Workspace / Issue',hint:'multica issue · 项目与任务卡绑定'},
+  {id:'star',name:'STAR',symbol:'?',subtitle:'自有项目平台（待公开）',hint:'通过配置的 STAR HTTPS 接口派发任务，异步回执'}
 ];
 export const terminalStates = ['completed','failed','dispatched','cancelled','needs_review'];
 export const stateLabels={queued:'排队中',running:'执行中',cancelling:'正在取消',completed:'已完成',failed:'失败',dispatched:'已派发',cancelled:'已取消',needs_review:'需要检查'};
@@ -21,6 +22,7 @@ export function validateTask(p){
     if(p.context?.multica_mode==='existing' && !p.context?.multica_issue_id)return '使用已有任务卡时必须填写 Issue ID';
     if(!p.context?.multica_issue_id && !p.context?.multica_project_id)return 'Multica 创建任务卡时必须选择 Project';
   }
+  if(p.provider==='star' && (!p.context?.star_project_id || (p.context?.star_mode==='existing' && !p.context?.star_ticket_id)))return 'STAR 必须填写项目，引用已有任务时还需要任务卡 ID';
   if((p.attachments?.length??0)>20)return '最多允许 20 个附件';
   return null;
 }

@@ -1,4 +1,6 @@
 mod model;
+mod rag;
+mod ai;
 mod server;
 mod worker;
 use std::env;
@@ -22,7 +24,7 @@ async fn main()->Result<(),Box<dyn std::error::Error>>{
     let parallel=env::var("ARGO_MAX_PARALLEL").ok().and_then(|s|s.parse::<usize>().ok()).unwrap_or(2);
     worker::run(endpoint,node,token,parallel).await?;
   },
-  _=>{eprintln!("Argo 0.1.0\n  cargo run -p argo-runtime -- server\n  cargo run -p argo-runtime -- worker\nSee README.md for environment variables.");}
+  _=>{eprintln!("Argo 0.3.0\n  cargo run -p argo-runtime -- server\n  cargo run -p argo-runtime -- worker\nSee README.md for environment variables.");}
  }
  Ok(())
 }

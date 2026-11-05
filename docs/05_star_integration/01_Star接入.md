@@ -1,50 +1,31 @@
-# Star ↔ Argo 集成设计
+# Star × Argo 独立项目接入设计
 
-ID：ARGO-INT-001 · 版本：1.0
+- Star 仍管理项目、任务卡、无限画布和协作；Argo 管理 Agent Runtime、Worker 舰队和个人上下文。
+- Star Next.js 服务端代理使用 `examples/star-integration/argo-client.ts`；API Token 始终保存在服务端。
+- 页面路径建议：`/workspace/:id/argo` Agent 执行面板、`/workspace/:id/knowledge` 嵌入/跳转个人 RAG；独立启动时依然有 Argo 原生 Tauri UI。
+- 映射：Star Task ID ↔ Argo Task ID ↔ RAG source_key；只通过服务端授权请求，不能让任何用户跨项目查看其他人的知识/仓库。
+- 给 Star 展示的 WebView/iframe 不建议携带 Admin Token；采用 Star 自身 API 受控代理和短期执行会话。
+- 建议新增：`listArgoRagChunks`、`ingestArgoRag`、`reviewArgoRagChunk`、`syncArgoRag`、`remoteSearchArgoRag`；这些是 server-only SDK。
 
-## 独立边界
-
-Argo 必须保持一个单独 Git 仓库、单独版本号、单独部署流水线。Star 不直接读取 Argo SQLite，也不承载 Agent 进程；Star 只保存 Argo task ID 与 Star 的 Feature/Sprint/Ticket/Card ID 关联，并消费 Argo API 的状态。Argo UI 可单独访问，Star 无需复制其源文件。
-
-## 推荐部署
+## Mermaid
 
 ```mermaid
-flowchart LR
-  USER[Star 终端用户] --> NEXT[Star Next.js Server]
-  NEXT -->|Star Session + RBAC| PROXY[Star /api/argo Proxy]
-  PROXY -->|ARGO_ADMIN_TOKEN hidden| ARGO[Argo Controller]
-  ARGO --> NODE_A[Node A Rust Worker]
-  ARGO --> NODE_B[Node B Rust Worker]
+sequenceDiagram
+ participant U as Star用户
+ participant S as Star API
+ participant A as Argo Controller
+ participant W as Rust Worker
+ participant V as Vercel个人RAG
+ U->>S: 选择Agent/项目文件/任务
+ S->>A: POST /tasks (服务端鉴权)
+ A-->>S: task_id
+ W->>A: claim
+ A-->>W: Task
+ W-->>A: 日志+工件+完成回执
+ A->>A: 有授权则生成RAG草稿
+ U->>S: 审核/批准RAG片段
+ S->>A: PATCH review + POST sync
+ A->>V: HTTPS Upsert + Idempotency-Key
+ V-->>A: 2xx remote id
+ A-->>S: 已入库
 ```
-
-第一版 Argo API 的 Admin Token 权限过大，**严禁**直接在浏览器 `NEXT_PUBLIC_*` 下暴露，Star 在自己的服务端完成用户登录、项目成员权限及 Ticket 可访问性审查，再由服务端附加 Admin Token 转发。Star 对任务输入及返回日志应二次核验租户权限，防止不同 Star 用户互相阅读。
-
-## 逻辑数据映射
-
-| Star 字段 | Argo 字段 | 备注 |
-|---|---|---|
-| `ticket.id` | `external_ref.star_ticket_id`（Star 保存本地关联） | Argo MVP 不持久化外部关联字段；优先由 Star 自己保存 |
-| `worktree_repo_alias` | `repo_alias` | 两端命名须一致；Worker 映射成本机路径 |
-| `assigned_agent` | `provider` + `context` | 平台适配器专属字段 |
-| `node_hint` | `target_node` | null 表示自动调度 |
-| `ticket.requirements` | `prompt` | 对 Prompt 进行长度上限和敏感信息校验 |
-| `argo.task.id` | `task_id` | Star DB 记录一对多 |
-| `argo.task.state` | `run_state` | Star 卡片只展示 `dispatched`，不能当成 completed |
-| `argo.artifacts` | review links | 下载补丁后进入 MAGOS 统一审查与合并 |
-
-## Star 工作流
-
-1. Star 用户在 Ticket/Feature 面板点击「交给 Argo」。
-2. Star 服务端校验能否写入对应 Ticket；获取被允许的节点/Repo 选择列表。
-3. UI 使用相同字段模式提交 `title/prompt/provider/context/repo_alias/target_node`，由 Star Server Proxy 调用 Argo。
-4. Star 保存 `ticket_id ↔ argo_task_id`；以请求轮询或服务端订阅（未来）刷新状态。
-5. 当 Argo 返回 completed 时展示补丁、测试日志与审查入口；当 dispatched 时展示 Orca/Multica 已受理，等待该平台独立执行状态的后续补充。
-6. 由用户、Star 或 MAGOS 流程审核后再合并到受保护分支。
-
-## Star 服务端 API 例子
-
-详见 `examples/star-integration/argo-client.ts`。范例只负责服务端 REST 调用，不附带可能绕过 Star 认证的开放 Proxy Route。需要 Star 工程实现自身 SSO 与 Ticket RBAC 后调用客户端库。
-
-## 版本契约
-
-对接 `/api/v1`，请求体与响应字段通过 OpenAPI 描述。Argo 项目自行发布 Release；Star 每次升级需要进行 `ST-011` 权限联动测试。未来增加 OpenTelemetry trace_id、Provider 原生 run_id、Webhook 与 SSE 时，应保留 v1 的兼容窗口。

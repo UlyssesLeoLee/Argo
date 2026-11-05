@@ -1,0 +1,36 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Argo",
+  "version": "0.3.0",
+  "identifier": "dev.argo.agent.cluster",
+  "build": {
+    "frontendDist": "../web",
+    "devUrl": "http://localhost:8997",
+    "beforeDevCommand": "python -m http.server 8997 --directory web"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Argo · Agent / RAG",
+        "width": 1420,
+        "height": 930,
+        "minWidth": 900,
+        "minHeight": 680,
+        "backgroundColor": "#F8F4EC"
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; img-src 'self' data:; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'"
+    },
+    "withGlobalTauri": true
+  },
+  "bundle": {
+    "active": false,
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/256x256.png",
+      "icons/icon.ico"
+    ]
+  }
+}

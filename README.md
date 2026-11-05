@@ -1,115 +1,92 @@
-# Argo — 独立多节点 AI Agent 统一控制台
+# Argo 0.3.0 — 多机 Agent Runtime + 跨平台个人记忆
 
-> 版本 0.1.0 · 2026-11-05 · 首版可审查源码 + 网页控制台 + Rust 控制面/Worker + 测试 + IPA 风格设计资料。
+独立项目：**Rust Controller / Worker + Tauri 2 桌面客户端 + 通用 RAG 连接器 + 用户自带 AI Key 的知识预处理**。与 Star 通过可配置 API 集成，不侵入 Star 源仓库。MIT 许可（第三方 CLI 各自许可单独核查）。
 
-Argo 不修改 Star 仓库；作为独立项目运行，可通过 REST API 由 Star 服务端接入。统一界面选择 Claude Code、Codex、Hermes、Orca、MiniMax Code、Multica，自动将用户输入转换为各自的 CLI 调用，并在授权的 Windows/Linux/macOS Worker 节点执行。
+## 0.3 功能边界
 
-## 交付状态与真实边界
+| 模块 | 当前交付 | 限制 |
+|---|---|---|
+| 桌面 UI | 七平台单 Agent 选项卡、专属输入、机器/路径隶属展示、执行节点独立选择 | UI 已作 JS 静态检查与契约测试；Tauri 真机待验证 |
+| 机器集群 | Rust Worker 主动注册、任务领取、租约、心跳、结果、Git patch 与 SHA256 附件 | 写仓库的执行机器必须为文件归属机器；尚无跨节点安全写回 |
+| CLI | Claude、Codex、Hermes、Orca、Multica；MiniMax 经 Hermes MiniMax provider | 第三方实际 CLI 版本和认证需现场 IT；Orca/Multica 派发不等于完成 |
+| STAR | 第七平台、问号占位 Logo、项目/任务卡、带 Token 的 HTTPS Webhook 适配器 | STAR 尚未推出；须用户自行实现约定回执 API |
+| 本地 RAG | SQLite 记忆分段、去重、来源追踪、审核、链接、归档、检索、版本回滚 | 当前检索为关键词匹配；独立向量索引由外部 RAG 提供 |
+| RAG 连接 | 支持多个任意 HTTPS JSON 兼容连接器，通过环境变量管理服务密钥 | 必须适配对方 API 的 JSON 契约；不自动猜测不同服务结构 |
+| AI 预处理 | 使用请求临时提供的个人 API Key；标签、摘要、结构提取、改写；先预览后按批提交与审计恢复 | 依赖 OpenAI 兼容 chat/completions；不保证模型输出正确，需要人工审核 |
+| 全库批处理 | 查询全库 ID，再每 8 条预览、按确认规则处理，支持中止与进度 | 客户端窗口保持打开；尚非服务器后台持久作业，失败时需手动续跑 |
 
-- ✅ 前端：可响应式统一输入、平台上下文表单、Orca/Multica 元数据发现、文件拖放、节点与任务列表、日志、取消、结果文件下载、深浅主题、Token 会话、无凭据演示模式。
-- ✅ Rust **源码实现**：控制面 REST、SQLite 队列、节点注册与心跳、CAS 领取、租约、Worker 并行槽、进程执行和 stdout/stderr 事件、附件与 SHA-256 Blob、Git 工作树与差异回传、输出文件回传。
-- ✅ 六个平台的命令适配器源码与参数校验；Orca/Multica 的 `dispatched` 代表平台接受派发，不代表远端 Agent 已完成。
-- ✅ 已执行：Node.js 前端 10 项单体/契约测试。`tests/integration_cluster.py` 可在 Rust 可用时自动运行两 Worker 的不收费端到端模拟测试。
-- ⚠️ 当前制作环境**没有 Cargo / rustc**，因此 Rust 二进制未在此环境编译，Rust 单测和真实跨机 E2E 未执行；请在有 Rust 工具链的环境执行 `cargo test` 和集成脚本。不得将源码存在误称为经过生产验证。
-- ⚠️ 第三方 CLI 是否登录、安装、版本匹配需在用户节点验证；没有接入任何真实账号，也没有调用付费模型。
-- ⚠️ 首版身份认证是 Admin/Worker 双 Token，不包含生产级多租户 RBAC、OS 容器/VM 级强沙箱、自动模型分片和透明显存共享。Git Worktree 只隔离 Git 工作目录，不能当作安全沙箱。
-
-## 目录
-
-```text
-Argo/
-├── crates/argo/src/           # Rust server / worker / model adapters
-├── web/                       # 独立可运行 Web UI（无需构建依赖）
-├── docs/                      # IPA 阶段式设计文档、UT/IT/ST/E2E
-├── tests/                     # Node 纯函数测试、Python 双 Worker E2E
-├── examples/                  # OpenAPI、Star 对接示例、环境变量
-├── scripts/run-tests.sh       # 单键质量检查
-├── requirements_and_tests.xlsx
-└── Cargo.toml
-```
-
-## 快速预览（只测试 Web 页面，不使用模型）
-
-在 Argo 根目录运行：
+## 快速预览（无真实外部操作）
 
 ```powershell
+cd Argo
 python -m http.server 8899 --directory web
 # 浏览器打开 http://127.0.0.1:8899/?demo=1
 ```
 
-演示模式内所有任务和模型输出都明确标识为模拟数据，不会执行真实 CLI。
+默认进入 Multica，顶端另有 STAR `?` 选项卡；左侧切到个人 RAG 后展开「AI 智能整理」演示流程。**?demo=1 不会调用 CLI、AI 或上传 RAG**。
 
-## Windows：启动真实本地控制面
+## Rust Controller / Worker
 
-安装 Rust stable（建议 rustup 安装）和 Git 后，打开 PowerShell：
+安装 Rust stable、Git 和所选 Agent CLI。示例变量见 `examples/.env.example`，**请先设置不同的强管理员和 Worker Token**。
 
 ```powershell
-cd D:\source\Argo
-$env:ARGO_ADMIN_TOKEN = 'CHANGE-TO-STRONG-RANDOM-ADMIN-TOKEN-32'
-$env:ARGO_WORKER_TOKEN = 'CHANGE-TO-STRONG-RANDOM-WORKER-TOKEN-32'
-$env:ARGO_BIND = '127.0.0.1:8788'
-$env:ARGO_DATA_DIR = '.\data'
-$env:ARGO_WEB_DIR = '.\web'
 cargo run -p argo-runtime -- server
-```
-
-新 PowerShell 会话，使用相同 Worker Token（不要混用 Admin）：
-
-```powershell
-cd D:\source\Argo
-$env:ARGO_WORKER_TOKEN = 'CHANGE-TO-STRONG-RANDOM-WORKER-TOKEN-32'
-$env:ARGO_SERVER = 'http://127.0.0.1:8788'
-$env:ARGO_NODE_ID = 'win-main'
-$env:ARGO_MAX_PARALLEL = '2'
-$env:ARGO_REPOS = 'star=D:\source\Star;ide=D:\source\IDE1.0'
+# 在本机或其他受信计算机上启动 Worker（使用同一 ARGO_WORKER_TOKEN）
 cargo run -p argo-runtime -- worker
 ```
 
-打开 `http://127.0.0.1:8788/` →「连接设置」→ 输入 Admin Token → 选择 Agent、仓库、目标节点并提交。
+服务端默认 `127.0.0.1:8788`，采用 Bearer 身份验证。不同电脑联网使用 TLS 反向代理或者 VPN，不要将 HTTP 控制端口直接暴露公网。`src-tauri/` 需要安装 Tauri CLI、Rust 及相应桌面构建依赖。
 
-## 第二台计算机
+## AI 预处理
 
-第二台电脑安装相同版本 Argo，并安装自己要使用的 AI CLI：
+1. 在个人 RAG 页选择片段、筛选结果或全库所有记忆；选择标签、摘要、结构提取或按统一要求改写。
+2. 输入 AI 服务、模型、**个人 API Key**、统一规则；API Key 不保存在数据库和浏览器存储中，仅本次请求传给本机/受信控制面并由控制面转发至模型服务。
+3. 点击「预览 AI 修改」。最多预览第一批 8 条；应用时明确确认所选全部数量，后续每批采用同一规则。用户可中止后续批次。
+4. 成功写入本地版本快照，**状态重置为待审核**；重新审核通过后才能同步至选择的外部知识库。
+5. 片段详情的「版本历史」可恢复之前的内容（恢复后同样待审核）。
+
+提醒：**模型看到的知识片段是来自用户的待处理数据**。当前实施脱敏正则，但不能覆盖一切个人或企业秘密；有机密的知识不要发送不受信模型。不存在跨平台自动收集全部其他产品历史聊天的权限，采集需通过本项目明确授权或导入。
+
+## 通用 RAG 连接
+
+服务端变量示例（可连接自己部署在 Vercel、Cloudflare、家庭 NAS、其他云的 RAG，只要对接相同 JSON 接口）：
+
+```dotenv
+ARGO_RAG_CONNECTORS_JSON=[{"id":"personal","name":"个人知识库","upsert_url":"https://rag.example.com/api/upsert","search_url":"https://rag.example.com/api/search","token_env":"ARGO_RAG_PERSONAL_TOKEN"}]
+ARGO_RAG_PERSONAL_TOKEN=your-long-secret
+```
+
+旧配置 `ARGO_RAG_UPSERT_URL`、`ARGO_RAG_SEARCH_URL`、`ARGO_RAG_API_TOKEN` 仍被支持作为默认连接器。前端不展示任何部署供应商标识。
+
+服务端 `POST /api/v1/rag/sync` 带 `connector_id` 选择目标。参考网关示例仍放在 `examples/vercel-rag-gateway/`，它只是**众多可选部署方式之一**。
+
+## STAR 平台（占位适配）
+
+该平台尚未公开。前端提供 `?` 临时标志，项目和任务卡输入；Worker 只有在配置下述环境变量并成功注册后才执行派发：
+
+```dotenv
+ARGO_STAR_DISPATCH_URL=https://star.example.com/api/argo/dispatch
+ARGO_STAR_SERVICE_TOKEN=your-separate-secret
+```
+
+发送 JSON `idempotency_key`、`source`、`task_id`、`title`、`prompt`、`project_id`、`ticket_id`、`mode`；返回 JSON 至少含 `id`。状态只标记为 `dispatched`，不能据此认定 Star 后续任务已完成。
+
+## 项目目录
+
+- `crates/argo/`：Rust Controller、Worker、REST/Webhook/CLI 适配、RAG 和 AI 预处理。
+- `src-tauri/`：Tauri 2 桌面壳与请求桥。
+- `web/`：无构建工具前端，可直接预览；七 Agent Tab、个人 RAG、AI 批处理。
+- `design/`：可编辑 UI SVG、Argo Logo、STAR 问号占位 Logo 及 PNG 预览。
+- `docs/`：要件定义、基本设计、详细设计、UT/IT/ST/E2E、运维、风险与 WBS。
+- `examples/`：通用连接器配置、STAR Webhook 契约、可选的 Next.js RAG 网关。
+- `scripts/`、`tests/`：测试、预检、辅助运维脚本。
+- `requirements_and_tests.xlsx`：完整需求、测试、WBS 与接口追踪。
+
+## 验证
 
 ```powershell
-$env:ARGO_SERVER = 'https://argo.example.com'     # 指向第一台控制面的 HTTPS 入口
-$env:ARGO_WORKER_TOKEN = '与控制面相同的 Worker Token'
-$env:ARGO_NODE_ID = 'win-gpu-02'
-$env:ARGO_REPOS = 'star=D:\source\Star'
-$env:ARGO_MAX_PARALLEL = '3'
-cargo run -p argo-runtime -- worker
+npm test
+./scripts/run-tests.ps1
 ```
 
-注意：控制面默认只监听 `127.0.0.1`。跨机请通过 Tailscale 或 HTTPS 反向代理保护服务；公网不可直接以无 TLS 的 `0.0.0.0` 暴露 Bearer Token。
-
-## 平台准备
-
-| 选择 | Node 侧必须可用 | 执行语义 |
-|---|---|---|
-| Claude | `claude`、完成本地认证 | `claude -p ...` 后退出 |
-| Codex | `codex`、完成认证 | `codex exec --json ...` |
-| Hermes | `hermes`、完成认证 | `hermes chat --query-file ... --oneshot` |
-| MiniMax | `mcode`、完成认证 | `mcode exec ...` |
-| Orca | 已运行的 Orca、已注册 `orca` CLI | 创建 Worktree 并触发 Agent；状态 `dispatched` |
-| Multica | `multica`、Workspace 授权、本地 Daemon | 创建/关联 Issue 并分配；状态 `dispatched` |
-
-MiniMax 和 Multica 的账户配置以及模型权限由它们自己维护，Argo 不储存第三方凭据。
-
-## 验证命令
-
-```bash
-node --test tests/ui.contract.test.mjs     # 当前环境已通过
-cargo fmt --all -- --check                # 需 Rust 工具链
-cargo test --workspace                    # 需 Rust 工具链
-python3 tests/integration_cluster.py      # 两个模拟 Worker，不触发模型计费
-```
-
-Windows 下如已构建：`python tests/integration_cluster.py .\target\debug\argo-runtime.exe`。
-
-## Star 集成
-
-参照 `docs/05_star_integration/01_Star接入.md` 和 `examples/star-integration/`。Star 只调用 Argo 的任务与查询 API；模型凭据仅保留在 Worker 侧。切勿把 `ARGO_ADMIN_TOKEN` 放入 Next.js 的 `NEXT_PUBLIC_*` 环境变量。
-
-## 许可与核验来源
-
-Argo 代码以 MIT 许可证交付。第三方平台采用各自的许可证，使用者应自行遵守。适配器依据的官方或仓库文档见 `docs/03_detailed_design/02_平台适配器契约.md`。
+当前交付环境没有 Cargo/Rustc，无法声称 Rust/Tauri 已编译通过；真实模型 API、STAR 服务和双机执行也未联调。交付的 E2E、IT/ST 文档提供了实际验收步骤。生产部署前必须完成权限隔离、TLS、节点身份、Secret 管理、配置备份和审核。

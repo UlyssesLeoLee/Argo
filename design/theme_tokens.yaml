@@ -1,0 +1,20 @@
+name: Argo Comic Light v0.3
+identity: Greek Argonauts collaboration; no ship illustrations in interface header
+ui: Tauri 2 desktop
+principles:
+  - one-agent-one-task-at-a-time
+  - progressive-disclosure
+  - file-machine-repository-path-as-one-group
+  - independent-execution-node
+  - subtle-comic-ink-lines-with-space
+  - one-primary-action
+  - vendor-neutral-rag-connector
+colors:
+  paper: '#FAF8F3'
+  card: '#FFFDF9'
+  ink: '#243B54'
+  primary_action: '#DCE9C1'
+  secondary_accent: '#D4AB66'
+  teal: '#6E9EA5'
+  caution: '#B86A4A'
+  success: '#4F8D68'

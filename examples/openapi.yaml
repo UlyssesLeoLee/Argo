@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Argo Cluster Runtime API
-  version: 0.1.0
+  version: 0.3.0
   description: >-
     独立 Rust 控制面；此规格覆盖 Star 使用的 Admin API 与 Worker 通信 API。
     仅为首版接口，不暗示已通过真实平台或跨机测试。
@@ -34,7 +34,7 @@ components:
         prompt: { type: string, minLength: 1, maxLength: 120000 }
         provider:
           type: string
-          enum: [claude, codex, hermes, minimax, orca, multica]
+          enum: [claude, codex, hermes, minimax, orca, multica, star]
         model: { type: [string, 'null'] }
         target_node: { type: [string, 'null'] }
         repo_alias: { type: [string, 'null'] }
@@ -227,3 +227,179 @@ paths:
       summary: Worker 提交最终调度状态
       parameters: [ { in: path, name: id, required: true, schema: { type: string } } ]
       responses: { '200': { description: 已提交 } }
+
+  /api/v1/rag/status:
+    get:
+      summary: 本地片段统计与 Vercel 网关配置状态
+      responses:
+        '200': { description: total / draft / approved / remote_configured / remote_search_configured }
+  /api/v1/rag/chunks:
+    get:
+      summary: 本地片段检索（最多200）
+      parameters:
+        - in: query
+          name: query
+          schema: { type: string }
+        - in: query
+          name: provider
+          schema: { type: string }
+        - in: query
+          name: project
+          schema: { type: string }
+        - in: query
+          name: status
+          schema: { type: string, enum: [draft, approved, synced, archived] }
+      responses:
+        '200': { description: rag_chunks 列表 }
+    post:
+      summary: 创建本地 RAG 草稿并按 Unicode 安全切段
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [source_key, source_kind, provider, project, title, content]
+              properties:
+                source_key: { type: string, maxLength: 240 }
+                source_kind: { type: string, maxLength: 60 }
+                provider: { type: string, maxLength: 40 }
+                project: { type: string, maxLength: 100 }
+                title: { type: string, maxLength: 240 }
+                content: { type: string, maxLength: 80000 }
+                task_id: { type: [string, 'null'] }
+                tags: { type: array, items: { type: string }, maxItems: 12 }
+      responses:
+        '200': { description: chunk_ids/status=draft }
+  /api/v1/rag/chunks/{id}:
+    get:
+      summary: 片段详情
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: 片段 }
+        '404': { description: 无此片段 }
+    patch:
+      summary: 修订片段并检查 revision 乐观锁
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [revision]
+              properties:
+                revision: { type: integer }
+                title: { type: string }
+                content: { type: string }
+                tags: { type: array, items: { type: string } }
+                status: { type: string, enum: [draft, approved, archived] }
+      responses:
+        '200': { description: ok }
+        '409': { description: 修订冲突 }
+  /api/v1/rag/chunks/{id}/links:
+    get:
+      summary: 读取知识链接
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: links }
+    post:
+      summary: 建立知识关联
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: ok }
+  /api/v1/rag/task/{id}/capture:
+    post:
+      summary: 仅采集主动开启 rag_capture 的已结束任务
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: chunk_ids }
+        '400': { description: 未授权采集/未结束 }
+  /api/v1/rag/retrieve:
+    post:
+      summary: 本地已审核片段关键词召回
+      responses:
+        '200': { description: ranked chunks }
+  /api/v1/rag/sync:
+    post:
+      summary: 把已批准片段同步到用户选择的知识库
+      responses:
+        '200': { description: synced/failed }
+        '412': { description: 远端配置未完成 }
+  /api/v1/rag/remote-search:
+    post:
+      summary: 检索外部知识库
+      responses:
+        '200': { description: results/mode/source }
+        '412': { description: 未配置 SEARCH URL }
+  /api/v1/rag/connectors:
+    get:
+      summary: 返回可配置的知识库连接器元数据（不包含 Token）
+      responses:
+        '200': { description: 连接器列表 }
+  /api/v1/ai/preview:
+    post:
+      summary: 由用户临时 API Key 执行一批最多 8 条的 AI 预处理，仅返回预览
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ids, operation, provider, model, api_key]
+              properties:
+                ids: { type: array, minItems: 1, maxItems: 8, items: { type: string } }
+                operation: { type: string, enum: [tags, summary, structured, rewrite] }
+                provider: { type: string, enum: [openai, openrouter, minimax, custom] }
+                model: { type: string }
+                api_key: { type: string, description: 本次请求临时密钥，不持久化 }
+                instructions: { type: string, maxLength: 1500 }
+      responses:
+        '200': { description: 通过 Schema 校验的 changes，不自动提交 }
+        '502': { description: 模型错误或输出不合规 }
+  /api/v1/ai/apply:
+    post:
+      summary: 用 CAS 与 SQLite 事务应用 AI 变更，保存历史版本并回到待审核
+      responses:
+        '200': { description: updated 和 review_required }
+        '409': { description: 乐观锁冲突 }
+  /api/v1/ai/revisions/{id}:
+    get:
+      summary: 获取指定知识片段的历史版本元信息
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: 版本列表 }
+  /api/v1/ai/revisions/{id}/restore:
+    post:
+      summary: 恢复历史版本并回到待审核
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: restored/reapproval_required }

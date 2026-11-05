@@ -1,0 +1,15 @@
+{
+  "name": "argo-desktop",
+  "private": true,
+  "version": "0.3.0",
+  "type": "module",
+  "scripts": {
+    "preview": "python -m http.server 8899 --directory web",
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "test": "node --test tests/ui.contract.test.mjs tests/rag.contract.test.mjs tests/v03.contract.test.mjs"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.0.0"
+  }
+}
