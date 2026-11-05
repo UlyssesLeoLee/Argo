@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0b1221" />
+  <meta name="description" content="Argo — 多平台、多节点 AI Agent 任务控制台" />
+  <title>Argo · Agent Cluster Console</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+<div class="shell">
+  <aside class="rail">
+    <div class="monogram" aria-label="Argo">A<span>·</span></div>
+    <div class="rail-menu">
+      <button type="button" class="rail-button selected" data-tab="compose" title="统一输入" aria-label="统一输入"><span>✦</span></button>
+      <button type="button" class="rail-button" data-tab="runs" title="执行记录" aria-label="执行记录"><span>◫</span></button>
+      <button type="button" class="rail-button" data-tab="nodes" title="计算节点" aria-label="计算节点"><span>⬡</span></button>
+      <button type="button" class="rail-button" data-tab="settings" title="连接设置" aria-label="连接设置"><span>⚙</span></button>
+    </div>
+    <div class="rail-bottom"><span class="rail-dot"></span><span class="rail-v">v0.1</span></div>
+  </aside>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand"><b>ARGO</b><span class="brand-divider"></span><span>Agent Cluster Runtime</span></div>
+      <div class="top-actions">
+        <div class="env-chip"><span class="pulse"></span><span id="connectionStatus">未连接</span></div>
+        <span class="top-separator"></span>
+        <button type="button" id="refreshAll" class="plain-btn" title="刷新全部">⟳ <span>刷新</span></button>
+        <button type="button" id="themeButton" class="icon-btn" title="切换主题">◐</button>
+        <div class="avatar">AR</div>
+      </div>
+    </header>
+    <div class="page">
+      <section id="tab-compose" class="tab-screen active">
+        <div class="section-head"><div><div class="eyebrow">DISTRIBUTED AGENT WORKSPACE <span class="eyebrow-line"></span> 01</div><h1>将任务交给合适的 <em>Agent.</em></h1><p>一次输入，自动适配平台协议，并由集群中的目标计算机执行。</p></div><button class="subtle-btn" id="openDocs">查看接入规范 ↗</button></div>
+        <div class="workspace-grid">
+          <div class="main-stack">
+            <div class="surface provider-surface">
+              <div class="surface-title"><div><span class="section-number">01</span><h2>选择执行平台</h2></div><span class="tiny-note">共 6 个适配器</span></div>
+              <div id="providers" class="provider-grid" role="radiogroup" aria-label="执行平台"></div>
+            </div>
+            <div class="surface composer-surface">
+              <div class="surface-title"><div><span class="section-number">02</span><h2>任务编排</h2></div><span class="tiny-note" id="providerHint">CLI · 非交互式执行</span></div>
+              <label class="field-label" for="taskTitle">任务标题 <span>必填</span></label>
+              <input type="text" id="taskTitle" maxlength="200" placeholder="例如：审查登录模块并补充回归测试" autocomplete="off" />
+              <div class="field-spacer"></div>
+              <label class="field-label" for="taskPrompt">统一指令 <span>平台适配器将保留原始内容</span></label>
+              <div class="prompt-frame"><textarea id="taskPrompt" maxlength="120000" rows="8" placeholder="描述预期目标、修改范围、验收标准、可执行的测试等……"></textarea><div class="prompt-bottom"><span id="charCount">0 字</span><span><kbd>Ctrl</kbd> + <kbd>Enter</kbd> 提交</span></div></div>
+              <div id="contextFields" class="context-fields"></div>
+              <div class="field-spacer"></div>
+              <div class="two-col">
+                <div><label class="field-label" for="modelSelect">模型标识 <span>可选</span></label><input type="text" id="modelSelect" placeholder="使用平台默认模型" /></div>
+                <div><label class="field-label" for="repoAlias">工作仓库 <span>可选</span></label><select id="repoAlias"><option value="">独立工作空间 / 无仓库</option></select></div>
+              </div>
+              <div class="two-col secondary-options">
+                <div><label class="field-label" for="nodeSelect">执行机器</label><select id="nodeSelect"><option value="">自动调度 · Auto</option></select></div>
+                <div><label class="field-label" for="prioritySelect">执行策略</label><select id="prioritySelect"><option value="safe">独立工作区（非 OS 沙箱）</option></select></div>
+              </div>
+              <div class="attach-area" id="dropArea" tabindex="0" role="button" aria-label="选择文件"><span class="attach-symbol">＋</span><div><strong>添加任务资料</strong><span>拖放或点击 · 每个文件上限 10 MB · 最多 20 个</span></div><input type="file" id="attachmentPicker" multiple hidden /></div>
+              <div id="attachmentList" class="attachment-list"></div>
+              <div id="formError" class="form-error" role="alert" hidden></div>
+              <div class="composer-actions"><div class="safety-tip"><span>◇</span> 所有任务在节点侧独立执行，不共享主工作目录</div><button type="button" id="submitTask" class="primary-btn"><span>发送到集群</span><b>↗</b></button></div>
+            </div>
+          </div>
+          <aside class="side-stack">
+            <div class="surface cluster-card"><div class="surface-title"><div><span class="section-number">03</span><h2>集群概览</h2></div><span class="live-label">LIVE</span></div><div class="cluster-metrics"><div><strong id="nodeCount">—</strong><span>在线节点</span></div><div><strong id="runningCount">—</strong><span>进行中</span></div><div><strong id="queueCount">—</strong><span>待调度</span></div></div><div class="thin-divider"></div><div id="miniNodes" class="mini-nodes"><div class="empty-muted">连接 Daemon 后显示节点</div></div><button type="button" class="text-action" data-switch="nodes">查看所有计算节点 <span>↗</span></button></div>
+            <div class="surface activity-card"><div class="surface-title"><div><span class="section-number">04</span><h2>最近执行</h2></div><button type="button" class="quiet-link" data-switch="runs">全部</button></div><div id="recentRuns" class="recent-runs"><div class="empty-muted">暂无任务</div></div></div>
+            <div class="note-card"><div class="note-symbol">↗</div><h3>统一入口，异构执行。</h3><p>Claude / Codex / Hermes / MiniMax 直接运行 CLI；Orca 管理 Worktree；Multica 创建或关联任务卡。</p><span>ARGO / ADAPTER CONTRACT V1</span></div>
+          </aside>
+        </div>
+      </section>
+      <section id="tab-runs" class="tab-screen"><div class="section-head"><div><div class="eyebrow">RUNS / TELEMETRY</div><h1>任务执行与输出</h1><p>查看各节点的任务状态、标准输出、错误输出与派发回执。</p></div><button class="subtle-btn" id="refreshRuns">⟳ 刷新记录</button></div><div class="runs-layout"><div class="surface run-list-card"><div class="surface-title"><h2>执行记录</h2><select id="runFilter"><option value="all">所有状态</option><option value="running">运行中</option><option value="queued">队列中</option><option value="completed">已完成</option><option value="failed">失败</option><option value="dispatched">已派发</option></select></div><div id="runsList" class="run-list"></div></div><div class="surface run-detail-card"><div class="surface-title"><h2>执行详情</h2><button type="button" id="cancelTask" class="danger-btn" hidden>取消任务</button></div><div id="runDetail"><div class="empty-illustration">↗</div><p class="empty-center">选择左侧任务，查看输出与事件日志</p></div></div></div></section>
+      <section id="tab-nodes" class="tab-screen"><div class="section-head"><div><div class="eyebrow">CLUSTER / MACHINES</div><h1>集群节点管理</h1><p>每台机器运行 Argo Rust Daemon，并通过 HTTPS 主动领取任务。</p></div><button class="subtle-btn" id="refreshNodes">⟳ 刷新节点</button></div><div class="node-summary"><div><b id="allNodeCount">0</b><span>注册节点</span></div><div><b id="allOnlineCount">0</b><span>在线节点</span></div><div><b id="allAdapterCount">0</b><span>可用适配器实例</span></div></div><div id="nodesGrid" class="nodes-grid"></div><div class="surface info-panel"><h2>新增计算节点</h2><p>在其他电脑安装同一套 Argo Rust Runtime，设置 <code>ARGO_SERVER</code>、<code>ARGO_WORKER_TOKEN</code>、<code>ARGO_NODE_ID</code>，启动 <code>worker</code>。节点主动注册，无需让节点对公网开放监听端口。</p></div></section>
+      <section id="tab-settings" class="tab-screen"><div class="section-head"><div><div class="eyebrow">CONNECTION / CONFIGURATION</div><h1>连接与安全</h1><p>Argo 可独立部署，也可作为 Star 中的一个 Agent 运行中心。</p></div></div><div class="settings-layout"><div class="surface settings-card"><h2>API 访问</h2><p>浏览器只保存本次会话的访问令牌，不上传第三方平台 API Key。</p><label class="field-label" for="accessToken">Argo Admin Token</label><input id="accessToken" type="password" placeholder="粘贴 ARGO_ADMIN_TOKEN" autocomplete="off" /><div class="settings-actions"><button id="connectButton" class="primary-btn">连接控制面 →</button><button id="disconnectButton" class="subtle-btn">断开并清除</button></div><div class="thin-divider"></div><p class="settings-foot">控制面地址：<code id="apiEndpoint"></code>。远程访问必须配 HTTPS、反向代理与身份认证；不要通过公网直接暴露演示配置。</p></div><div class="surface settings-card"><h2>运行模式</h2><div class="switch-line"><div><strong>演示模式</strong><p>无需 Rust 服务与外部 CLI，可测试完整界面交互流程。</p></div><span id="demoIndicator" class="state-tag">关闭</span></div><div class="thin-divider"></div><h2>Star 集成</h2><p>通过 Star 的服务端 Proxy 对接 Argo REST API；不要向终端用户暴露 Worker Token 或第三方 CLI 凭据。</p><code class="code-line">GET /api/v1/nodes</code><code class="code-line">POST /api/v1/tasks</code><code class="code-line">GET /api/v1/tasks/:id/events</code></div></div></section>
+    </div>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  </div>
+</div>
+<script type="module" src="/app.mjs"></script>
+</body>
+</html>
