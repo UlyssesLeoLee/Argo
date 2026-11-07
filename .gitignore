@@ -1,0 +1,12 @@
+/target/
+/data/
+.env
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.log
+.DS_Store
+node_modules/
+
+src-tauri/binaries/*
+!src-tauri/binaries/README.md
